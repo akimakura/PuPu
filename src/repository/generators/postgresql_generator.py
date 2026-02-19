@@ -346,6 +346,8 @@ class GeneratorPostgreSQLRepository(GeneratorRepository):
     ) -> list[str]:
         """
         Собрать из сырых sql выражений (alter) запросы для postgres.
+        Если есть зависимые VIEW (например, композиты), они будут
+        удалены перед ALTER TABLE и пересозданы после.
 
         Args:
             datastorage (DataStorage): datastorage, который хотим обновить
@@ -356,10 +358,27 @@ class GeneratorPostgreSQLRepository(GeneratorRepository):
             list[str]: готовые запросы
         """
         database_objects = get_filtred_database_object_by_data_storage(datastorage, model.name)
-        sql_expressions_for_execute = []
+        database = DatabaseModel.model_validate(model.database)
+
+        table_names = [db_obj.name for db_obj in database_objects]
+        schemas = {db_obj.schema_name for db_obj in database_objects if db_obj.schema_name}
+        dependent_views: list[dict[str, str]] = []
+        for schema in schemas:
+            dependent_views.extend(await cls.find_views_by_table(database, schema, table_names))
+
+        drop_views_sql: list[str] = []
+        create_views_sql: list[str] = []
+        for view in dependent_views:
+            drop_views_sql.append(f"DROP VIEW IF EXISTS {view['view_schema']}.{view['view_name']}")
+            create_views_sql.append(
+                f"CREATE VIEW {view['view_schema']}.{view['view_name']} AS {view['view_definition']}"
+            )
+
+        alter_sql: list[str] = []
         for database_object in database_objects:
             for sql_expression in sql_expressions:
-                sql_expressions_for_execute.append(
+                alter_sql.append(
                     f"ALTER TABLE {database_object.schema_name}.{database_object.name} {sql_expression}"
                 )
-        return sql_expressions_for_execute
+
+        return drop_views_sql + alter_sql + create_views_sql
