@@ -210,8 +210,7 @@ class ClientPVDictionaries:
             ) as client:
                 url = urljoin(settings.PV_DICTIONARIES_URL, settings.PV_HIERARCHIES_CREATE_URL)
                 body = payload.model_dump(by_alias=True, exclude_none=True)
-                print(f"PVD Body: {body}")
-                logger.debug("Creating hierarchy in PVD: %s", body)
+                logger.debug("PVD hierarchy create request: url=%s, body=%s", url, body)
                 response = await client.post(url, json=body)
                 response.raise_for_status()
                 return response.json() if response.text else {}
@@ -238,7 +237,7 @@ class ClientPVDictionaries:
                     settings.PV_HIERARCHIES_UPDATE_URL % hierarchy_name,
                 )
                 body = payload.model_dump(by_alias=True, exclude_none=True)
-                logger.debug("Updating hierarchy in PVD: %s", body)
+                logger.debug("PVD hierarchy update request: url=%s, body=%s", url, body)
                 response = await client.put(url, json=body)
                 response.raise_for_status()
                 return response.json() if response.text else {}

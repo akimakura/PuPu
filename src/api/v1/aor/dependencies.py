@@ -44,6 +44,7 @@ from src.service.dimension import DimensionService
 from src.service.hierarchy import HierarchyService
 from src.service.measure import MeasureService
 from src.service.model import ModelService
+from src.service.pv_hierarchy import HierarchyPvdService
 
 
 async def get_dso_service(
@@ -129,9 +130,20 @@ async def get_database_service(
     return DatabaseService(database_repository, aor_client)
 
 
+async def get_hierarchy_pvd_service(
+    hierarchy_repository: Annotated[HierarchyRepository, Depends(get_hierarchy_repository)],
+    dimension_service: Annotated[DimensionService, Depends(get_dimension_service)],
+) -> HierarchyPvdService:
+    return HierarchyPvdService(
+        hierarchy_repo=hierarchy_repository,
+        dimension_service=dimension_service,
+    )
+
+
 async def get_hierarchy_service(
     hierarchy_repository: Annotated[HierarchyRepository, Depends(get_hierarchy_repository)],
     dimension_service: Annotated[DimensionService, Depends(get_dimension_service)],
+    pvd_service: Annotated[HierarchyPvdService, Depends(get_hierarchy_pvd_service)],
     data_storage_service: Annotated[DataStorageService, Depends(get_dso_service)],
     database_service: Annotated[DatabaseService, Depends(get_database_service)],
     model_service: Annotated[ModelService, Depends(get_model_service)],
@@ -166,6 +178,7 @@ async def get_hierarchy_service(
         aor_client=aor_client,
         hierarchy_history_repo=hierarchy_history_repo,
         aor_repository=aor_repository,
+        pvd_service=pvd_service,
     )
 
 

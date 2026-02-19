@@ -164,51 +164,49 @@ class DataStorageRepository:
         if old_any_field is not None and old_any_field is not field.any_field:
             await self.session.delete(old_any_field)
 
-    async def _update_or_create_fields(
+    async def _update_fields_in_place(
         self,
-        existing_fields: list[DataStorageField],
+        data_storage_orm: DataStorageOrm,
         new_fields_dicts: list[dict[str, Any]],
         tenant_id: str,
         model_names: list[str],
         ignore_field_name: Optional[str] = None,
-    ) -> list[DataStorageField]:
+    ) -> None:
         """
-        Обновляет существующие поля DataStorage или создаёт новые, сопоставляя по имени.
-        Сохраняет id существующих строк, избегая DELETE + INSERT,
-        что предотвращает нарушение внешних ссылок (например, из composite).
+        Обновляет поля DataStorage на месте в InstrumentedList, без замены коллекции.
+        Сопоставляет существующие поля по имени и обновляет их атрибуты,
+        новые поля добавляет через append, отсутствующие — удаляет через remove.
+        Сохраняет id существующих строк, что предотвращает нарушение FK из composite.
 
         Args:
-            existing_fields (list[DataStorageField]): Текущие ORM-объекты полей хранилища.
+            data_storage_orm (DataStorageOrm): ORM-объект хранилища, чья коллекция fields мутируется.
             new_fields_dicts (list[dict[str, Any]]): Список словарей с новыми значениями полей.
             tenant_id (str): Идентификатор тенанта.
             model_names (list[str]): Список имён моделей для резолва ссылок.
             ignore_field_name (Optional[str]): Имя поля, которое нужно пропустить.
-
-        Returns:
-            list[DataStorageField]: Обновлённый список ORM-объектов полей.
         """
-        existing_by_name: dict[str, DataStorageField] = {f.name: f for f in existing_fields}
-        result_fields: list[DataStorageField] = []
+        existing_by_name: dict[str, DataStorageField] = {f.name: f for f in data_storage_orm.fields}
+        new_field_names: set[str] = set()
 
         for field_dict in new_fields_dicts:
             field_name = field_dict["name"]
             if field_name == ignore_field_name:
                 continue
+            new_field_names.add(field_name)
 
             if field_name in existing_by_name:
-                existing_field = existing_by_name[field_name]
-                await self._update_field_attrs(existing_field, field_dict, tenant_id, model_names)
-                result_fields.append(existing_field)
+                await self._update_field_attrs(existing_by_name[field_name], field_dict, tenant_id, model_names)
             else:
                 model_field = await convert_field_to_orm(
                     self.session, field_dict, tenant_id, model_names, DataStorageField
                 )
-                if isinstance(model_field, DataStorageField):
-                    result_fields.append(model_field)
-                else:
+                if not isinstance(model_field, DataStorageField):
                     raise ValueError("Failed to cast model_field to DataStorageField")
+                data_storage_orm.fields.append(model_field)
 
-        return result_fields
+        for field_name, field in existing_by_name.items():
+            if field_name not in new_field_names and field_name != ignore_field_name:
+                data_storage_orm.fields.remove(field)
 
     async def create_or_update_data_storage_by_session(
         self,
@@ -1381,8 +1379,8 @@ class DataStorageRepository:
                 field.model_dump(mode="json", exclude_none=True) for field in self._get_log_data_storage_fields()
             ]
             log_data_storage_fields.extend(data_storage_dict.get("fields", []))
-            log_data_storage.fields = await self._update_or_create_fields(
-                existing_fields=log_data_storage.fields,
+            await self._update_fields_in_place(
+                data_storage_orm=log_data_storage,
                 new_fields_dicts=log_data_storage_fields,
                 tenant_id=tenant_id,
                 model_names=model_names,
@@ -1457,8 +1455,8 @@ class DataStorageRepository:
         data_storage_dict.pop("database_objects", [])
         if data_storage.fields is not None:
             original_data_storage.sharding_key = self._generate_sharding_key_by_fields(data_storage.fields)
-            original_data_storage.fields = await self._update_or_create_fields(
-                existing_fields=original_data_storage.fields,
+            await self._update_fields_in_place(
+                data_storage_orm=original_data_storage,
                 new_fields_dicts=copy.deepcopy(data_storage_dict.get("fields", [])),
                 tenant_id=tenant_id,
                 model_names=[model.name for m in original_data_storage.models],
