@@ -1,0 +1,3 @@
+from src.repository.view.core import ViewRepository as ViewRepository
+from src.repository.view.clickhouse import ViewClickhouseRepository as ViewClickhouseRepository
+from src.repository.view.postgresql import ViewPostgreSQLRepository as ViewPostgreSQLRepository

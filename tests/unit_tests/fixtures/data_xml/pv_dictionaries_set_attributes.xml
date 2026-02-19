@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Dictionary>
+	<Attributes>
+		<Long name="ID" label="ID" minEntries="1" unique="true"/>
+		<String name="testPv" label="short_test" maxLength="5" markdown="false" regex="^[А-ЯЁа-яёA-Za-z0-9_#-:;+.,]+$" description="long_test" minEntries="1" unique="true"/>
+		<Double name="dsoField1" label="test" minValue="-999999999999.1" maxValue="999999999999.9"/>
+		<Reference name="dimensionTest" label="test" key="ID" dictionary="dimensionTest" minEntries="1"/>
+		<Long name="dimensionTest2" label="test" minValue="-999999" maxValue="999999" minEntries="1"/>
+		<TimeDependentComposite begin="DATEFROM" end="DATETO" name="TdText" label="Тексты" multiple="true" maxEntries="32766">
+			<Date format="dd.MM.yyyy" defaultValue="1900-01-01T00:00:00" isDefaultValueNow="false" name="DATEFROM" label="Дата С" minEntries="1"/>
+			<Date format="dd.MM.yyyy" defaultValue="2299-12-31T23:59:59" isDefaultValueNow="false" name="DATETO" label="Дата По" minEntries="1"/>
+			<String name="txtlong" label="test" maxLength="4" markdown="false"/>
+		</TimeDependentComposite>
+		<TimeDependentComposite begin="DATEFROM" end="DATETO" name="TdAttribute" label="Атрибуты" multiple="true" maxEntries="32766">
+			<Date format="dd.MM.yyyy" defaultValue="1900-01-01T00:00:00" isDefaultValueNow="false" name="DATEFROM" label="Дата С" minEntries="1"/>
+			<Date format="dd.MM.yyyy" defaultValue="2299-12-31T23:59:59" isDefaultValueNow="false" name="DATETO" label="Дата По" minEntries="1"/>
+			<BigDecimal name="dsoField2" label="test" precision="1" minValue="-999.1" maxValue="999.9"/>
+		</TimeDependentComposite>
+	</Attributes>
+	<Keys>
+		<PrimaryKey>
+			<KeyAttribute name="ID"/>
+		</PrimaryKey>
+		<Key>
+			<KeyAttribute name="testPv"/>
+			<KeyAttribute name="dimensionTest"/>
+			<KeyAttribute name="dimensionTest2"/>
+			<KeyAttribute name="TdText/DATETO"/>
+			<KeyAttribute name="TdAttribute/DATETO"/>
+		</Key>
+	</Keys>
+</Dictionary>

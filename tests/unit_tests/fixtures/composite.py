@@ -1,0 +1,836 @@
+from datetime import datetime
+
+import pytest
+
+from src.db.any_field import AnyField, AnyFieldLabel
+from src.db.composite import (
+    Composite,
+    CompositeDatasource,
+    CompositeField,
+    CompositeFieldLabel,
+    CompositeLabel,
+    DatasourceLink,
+)
+from src.db.data_storage import DataStorage
+from src.db.database_object import DatabaseObject
+from src.db.dimension import Dimension
+from src.db.measure import Measure
+from src.db.model import Model
+from src.models.any_field import AggregationTypeEnum, AnyField as AnyFieldModel, AnyFieldTypeEnum
+from src.models.composite import (
+    Composite as CompositeModel,
+    CompositeCreateRequest as CompositeCreateRequestModel,
+    CompositeDatasource as CompositeDatasourceModel,
+    CompositeDatasourceRequest as CompositeDatasourceRequestModel,
+    CompositeEditRequest as CompositeEditRequestModel,
+    CompositeField as CompositeFieldModel,
+    CompositeFieldRefObjectEnum,
+    CompositeFieldRequest as CompositeFieldRequestModel,
+    CompositeLinkTypeEnum,
+    DatasourceLink as DatasourceLinkModel,
+    DatasourceLinkRequest,
+)
+from src.models.consts import DATA_TYPES
+from src.models.database import DatabaseTypeEnum
+from src.models.database_object import DatabaseObject as DatabaseObjectModel, DbObjectTypeEnum
+from src.models.dimension import DimensionTypeEnum
+from src.models.field import BaseFieldType, BaseFieldTypeEnum, SemanticType
+from src.models.label import Label, LabelType
+from src.models.measure import MeasureTypeEnum
+from src.models.model import ModelStatus, ModelStatusEnum
+from tests.unit_tests.fixtures.dimension import dimension_model_list
+from tests.unit_tests.fixtures.measure import measure_model_list
+
+
+@pytest.fixture
+def composites(
+    measures: list[Measure], dimensions: list[Dimension], models: list[Model], data_storages: list[DataStorage]
+) -> list[Composite]:
+    return [
+        Composite(
+            version=1,
+            timestamp=datetime(2023, 1, 1, 1, 1, 1, 1),
+            name="test_composite1",
+            tenant_id="tenant1",
+            models=[models[0]],
+            link_type=CompositeLinkTypeEnum.SELECT,
+            labels=[
+                CompositeLabel(
+                    language="ru-ru",
+                    type=LabelType.SHORT,
+                    text="test",
+                ),
+                CompositeLabel(
+                    language="ru-ru",
+                    type=LabelType.LONG,
+                    text="test",
+                ),
+            ],
+            database_objects=[
+                DatabaseObject(
+                    models=[models[0]],
+                    name="test_composite1",
+                    schema_name="test_schema1",
+                    tenant_id="tenant1",
+                    type=DbObjectTypeEnum.VIEW,
+                    specific_attributes=[],
+                ),
+            ],
+            datasources=[
+                CompositeDatasource(
+                    datastorage_datasource=data_storages[0],
+                    type=CompositeFieldRefObjectEnum.DATASTORAGE,
+                )
+            ],
+            fields=[
+                CompositeField(
+                    name="composite_field1",
+                    semantic_type=SemanticType.MEASURE,
+                    field_type=BaseFieldTypeEnum.MEASURE,
+                    labels=[
+                        CompositeFieldLabel(
+                            language="ru-ru",
+                            type=LabelType.SHORT,
+                            text="test",
+                        )
+                    ],
+                    measure=measures[0],
+                    datasource_links=[
+                        DatasourceLink(
+                            data_storage_field_ref=data_storages[0].fields[0],
+                            datasource_type=CompositeFieldRefObjectEnum.DATASTORAGE,
+                        )
+                    ],
+                ),
+                CompositeField(
+                    name="composite_field2",
+                    semantic_type=SemanticType.DIMENSION,
+                    field_type=BaseFieldTypeEnum.DIMENSION,
+                    labels=[
+                        CompositeFieldLabel(
+                            language="ru-ru",
+                            type=LabelType.SHORT,
+                            text="test",
+                        )
+                    ],
+                    dimension=dimensions[0],
+                    datasource_links=[
+                        DatasourceLink(
+                            data_storage_field_ref=data_storages[0].fields[1],
+                            datasource_type=CompositeFieldRefObjectEnum.DATASTORAGE,
+                        )
+                    ],
+                ),
+                CompositeField(
+                    name="composite_field3",
+                    semantic_type=SemanticType.MEASURE,
+                    field_type=BaseFieldTypeEnum.ANYFIELD,
+                    labels=[
+                        CompositeFieldLabel(
+                            language="ru-ru",
+                            type=LabelType.SHORT,
+                            text="test",
+                        )
+                    ],
+                    any_field=AnyField(
+                        name="test_any_field1",
+                        type=AnyFieldTypeEnum.DECIMAL,
+                        precision=12,
+                        scale=1,
+                        aggregation_type=AggregationTypeEnum.MAXIMUM,
+                        labels=[
+                            AnyFieldLabel(
+                                language="ru-ru",
+                                type=LabelType.SHORT,
+                                text="test",
+                            )
+                        ],
+                    ),
+                    datasource_links=[
+                        DatasourceLink(
+                            data_storage_field_ref=data_storages[0].fields[2],
+                            datasource_type=CompositeFieldRefObjectEnum.DATASTORAGE,
+                        )
+                    ],
+                ),
+            ],
+        ),
+        Composite(
+            version=1,
+            timestamp=datetime(2023, 1, 1, 1, 1, 1, 1),
+            name="test_composite2",
+            tenant_id="tenant1",
+            link_type=CompositeLinkTypeEnum.SELECT,
+            models=[models[0]],
+            database_objects=[
+                DatabaseObject(
+                    models=[models[0]],
+                    name="test_composite2",
+                    schema_name="test_schema1",
+                    tenant_id="tenant1",
+                    type=DbObjectTypeEnum.VIEW,
+                    specific_attributes=[],
+                ),
+            ],
+            labels=[
+                CompositeLabel(
+                    language="ru-ru",
+                    type=LabelType.SHORT,
+                    text="test",
+                ),
+            ],
+            datasources=[
+                CompositeDatasource(
+                    datastorage_datasource=data_storages[0],
+                    type=CompositeFieldRefObjectEnum.DATASTORAGE,
+                )
+            ],
+            fields=[
+                CompositeField(
+                    name="composite_field1",
+                    semantic_type=SemanticType.MEASURE,
+                    field_type=BaseFieldTypeEnum.MEASURE,
+                    labels=[
+                        CompositeFieldLabel(
+                            language="ru-ru",
+                            type=LabelType.SHORT,
+                            text="test",
+                        )
+                    ],
+                    measure=measures[0],
+                    datasource_links=[
+                        DatasourceLink(
+                            data_storage_field_ref=data_storages[0].fields[0],
+                            datasource_type=CompositeFieldRefObjectEnum.DATASTORAGE,
+                        )
+                    ],
+                ),
+            ],
+        ),
+        Composite(
+            version=1,
+            timestamp=datetime(2023, 1, 1, 1, 1, 1, 1),
+            name="test_composite3",
+            link_type=CompositeLinkTypeEnum.SELECT,
+            tenant_id="tenant1",
+            models=[models[1]],
+            datasources=[
+                CompositeDatasource(
+                    datastorage_datasource=data_storages[0],
+                    type=CompositeFieldRefObjectEnum.DATASTORAGE,
+                )
+            ],
+            database_objects=[
+                DatabaseObject(
+                    models=[models[1]],
+                    name="test_composite3",
+                    schema_name="test_schema2",
+                    tenant_id="tenant1",
+                    type=DbObjectTypeEnum.VIEW,
+                    specific_attributes=[],
+                ),
+            ],
+            fields=[
+                CompositeField(
+                    name="composite_field1",
+                    semantic_type=SemanticType.MEASURE,
+                    field_type=BaseFieldTypeEnum.MEASURE,
+                    labels=[
+                        CompositeFieldLabel(
+                            language="ru-ru",
+                            type=LabelType.SHORT,
+                            text="test",
+                        )
+                    ],
+                    measure=measures[0],
+                    datasource_links=[
+                        DatasourceLink(
+                            data_storage_field_ref=data_storages[0].fields[0],
+                            datasource_type=CompositeFieldRefObjectEnum.DATASTORAGE,
+                        )
+                    ],
+                ),
+            ],
+        ),
+    ]
+
+
+composite_model_list = [
+    CompositeModel(
+        version=1,
+        timestamp=datetime(2023, 1, 1, 1, 1, 1, 1),
+        name="test_composite1",
+        models_statuses=[
+            ModelStatus(
+                name="test_model1",
+                status=ModelStatusEnum.PENDING,
+                msg=None,
+            )
+        ],
+        models_names=["test_model1"],
+        database_objects=[
+            DatabaseObjectModel(
+                name="test_composite1",
+                schema_name="test_schema1",
+                tenant_id="tenant1",
+                type=DbObjectTypeEnum.VIEW,
+                specific_attributes=[],
+            ),
+        ],
+        datasources=[
+            CompositeDatasourceModel(
+                name="test_dso1",
+                type=CompositeFieldRefObjectEnum.DATASTORAGE,
+            )
+        ],
+        labels=[
+            Label(
+                language="ru-ru",
+                type=LabelType.SHORT,
+                text="test",
+            ),
+            Label(
+                language="ru-ru",
+                type=LabelType.LONG,
+                text="test",
+            ),
+        ],
+        fields=[
+            CompositeFieldModel(
+                name="composite_field1",
+                labels=[
+                    Label(
+                        language="ru-ru",
+                        type=LabelType.SHORT,
+                        text="test",
+                    )
+                ],
+                sql_column_type=DATA_TYPES[DatabaseTypeEnum.CLICKHOUSE][MeasureTypeEnum.FLOAT],
+                semantic_type=SemanticType.MEASURE,
+                ref_type=BaseFieldType(
+                    ref_object_type=BaseFieldTypeEnum.MEASURE,
+                    ref_object=measure_model_list[0].name,
+                ),
+                datasource_links=[DatasourceLinkModel(datasource="test_dso1", datasource_field="dso_field1")],
+            ),
+            CompositeFieldModel(
+                name="composite_field2",
+                labels=[
+                    Label(
+                        language="ru-ru",
+                        type=LabelType.SHORT,
+                        text="test",
+                    )
+                ],
+                sql_column_type=DATA_TYPES[DatabaseTypeEnum.CLICKHOUSE][DimensionTypeEnum.STRING],
+                semantic_type=SemanticType.DIMENSION,
+                ref_type=BaseFieldType(
+                    ref_object_type=BaseFieldTypeEnum.DIMENSION,
+                    ref_object=dimension_model_list[0].name,
+                ),
+                datasource_links=[DatasourceLinkModel(datasource="test_dso1", datasource_field="dso_field2")],
+            ),
+            CompositeFieldModel(
+                name="composite_field3",
+                semantic_type=SemanticType.MEASURE,
+                labels=[
+                    Label(
+                        language="ru-ru",
+                        type=LabelType.SHORT,
+                        text="test",
+                    )
+                ],
+                sql_column_type=DATA_TYPES[DatabaseTypeEnum.CLICKHOUSE][MeasureTypeEnum.DECIMAL] + "(12,1)",
+                ref_type=BaseFieldType(
+                    ref_object_type=BaseFieldTypeEnum.ANYFIELD,
+                    ref_object=AnyFieldModel(
+                        name="test_any_field1",
+                        type=AnyFieldTypeEnum.DECIMAL,
+                        precision=12,
+                        scale=1,
+                        aggregation_type=AggregationTypeEnum.MAXIMUM,
+                        labels=[
+                            Label(
+                                language="ru-ru",
+                                type=LabelType.SHORT,
+                                text="test",
+                            )
+                        ],
+                    ),
+                ),
+                datasource_links=[DatasourceLinkModel(datasource="test_dso1", datasource_field="dso_field3")],
+            ),
+        ],
+    ),
+    CompositeModel(
+        version=1,
+        timestamp=datetime(2023, 1, 1, 1, 1, 1, 1),
+        name="test_composite2",
+        models_statuses=[
+            ModelStatus(
+                name="test_model1",
+                status=ModelStatusEnum.PENDING,
+                msg=None,
+            )
+        ],
+        models_names=["test_model1"],
+        database_objects=[
+            DatabaseObjectModel(
+                name="test_composite2",
+                schema_name="test_schema1",
+                tenant_id="tenant1",
+                type=DbObjectTypeEnum.VIEW,
+                specific_attributes=[],
+            ),
+        ],
+        labels=[
+            Label(
+                language="ru-ru",
+                type=LabelType.SHORT,
+                text="test",
+            ),
+        ],
+        datasources=[
+            CompositeDatasourceModel(
+                name="test_dso1",
+                type=CompositeFieldRefObjectEnum.DATASTORAGE,
+            )
+        ],
+        fields=[
+            CompositeFieldModel(
+                semantic_type=SemanticType.MEASURE,
+                name="composite_field1",
+                labels=[
+                    Label(
+                        language="ru-ru",
+                        type=LabelType.SHORT,
+                        text="test",
+                    )
+                ],
+                sql_column_type=DATA_TYPES[DatabaseTypeEnum.CLICKHOUSE][MeasureTypeEnum.FLOAT],
+                ref_type=BaseFieldType(
+                    ref_object_type=BaseFieldTypeEnum.MEASURE,
+                    ref_object=measure_model_list[0].name,
+                ),
+                datasource_links=[DatasourceLinkModel(datasource="test_dso1", datasource_field="dso_field1")],
+            ),
+        ],
+    ),
+    CompositeModel(
+        version=1,
+        timestamp=datetime(2023, 1, 1, 1, 1, 1, 1),
+        name="test_composite3",
+        models_statuses=[
+            ModelStatus(
+                name="test_model2",
+                status=ModelStatusEnum.PENDING,
+                msg=None,
+            )
+        ],
+        models_names=["test_model2"],
+        database_objects=[
+            DatabaseObjectModel(
+                name="test_composite3",
+                schema_name="test_schema2",
+                tenant_id="tenant1",
+                type=DbObjectTypeEnum.VIEW,
+                specific_attributes=[],
+            ),
+        ],
+        datasources=[
+            CompositeDatasourceModel(
+                name="test_dso1",
+                type=CompositeFieldRefObjectEnum.DATASTORAGE,
+            )
+        ],
+        labels=[],
+        fields=[
+            CompositeFieldModel(
+                semantic_type=SemanticType.MEASURE,
+                name="composite_field1",
+                labels=[
+                    Label(
+                        language="ru-ru",
+                        type=LabelType.SHORT,
+                        text="test",
+                    )
+                ],
+                sql_column_type=DATA_TYPES[DatabaseTypeEnum.CLICKHOUSE][MeasureTypeEnum.FLOAT],
+                ref_type=BaseFieldType(
+                    ref_object_type=BaseFieldTypeEnum.MEASURE,
+                    ref_object=measure_model_list[0].name,
+                ),
+                datasource_links=[DatasourceLinkModel(datasource="test_dso1", datasource_field="dso_field1")],
+            ),
+        ],
+    ),
+]
+
+
+composite_model_create_list = [
+    CompositeCreateRequestModel(
+        name="test_composite1",
+        datasources=[CompositeDatasourceRequestModel(name="test_dso1", type=CompositeFieldRefObjectEnum.DATASTORAGE)],
+        link_type=CompositeLinkTypeEnum.SELECT,
+        labels=[
+            Label(
+                language="ru-ru",
+                type=LabelType.SHORT,
+                text="test",
+            ),
+        ],
+        fields=[
+            CompositeFieldRequestModel(
+                name="composite_field1",
+                semantic_type=SemanticType.MEASURE,
+                ref_type=BaseFieldType(
+                    ref_object_type=BaseFieldTypeEnum.MEASURE,
+                    ref_object=measure_model_list[0].name,
+                ),
+                labels=[
+                    Label(
+                        language="ru-ru",
+                        type=LabelType.SHORT,
+                        text="test",
+                    )
+                ],
+                datasource_links=[DatasourceLinkRequest(datasource="test_dso1", datasource_field="dso_field1")],
+            ),
+            CompositeFieldRequestModel(
+                name="composite_field2",
+                semantic_type=SemanticType.DIMENSION,
+                ref_type=BaseFieldType(
+                    ref_object_type=BaseFieldTypeEnum.DIMENSION,
+                    ref_object=dimension_model_list[0].name,
+                ),
+                labels=[
+                    Label(
+                        language="ru-ru",
+                        type=LabelType.SHORT,
+                        text="test",
+                    )
+                ],
+                datasource_links=[DatasourceLinkRequest(datasource="test_dso1", datasource_field="dso_field2")],
+            ),
+            CompositeFieldRequestModel(
+                name="composite_field3",
+                semantic_type=SemanticType.MEASURE,
+                ref_type=BaseFieldType(
+                    ref_object_type=BaseFieldTypeEnum.ANYFIELD,
+                    ref_object=AnyFieldModel(
+                        name="test_any_field1",
+                        type=AnyFieldTypeEnum.DECIMAL,
+                        precision=12,
+                        scale=1,
+                        aggregation_type=AggregationTypeEnum.MAXIMUM,
+                        labels=[
+                            Label(
+                                language="ru-ru",
+                                type=LabelType.SHORT,
+                                text="test",
+                            )
+                        ],
+                    ),
+                ),
+                labels=[
+                    Label(
+                        language="ru-ru",
+                        type=LabelType.SHORT,
+                        text="test",
+                    )
+                ],
+                datasource_links=[DatasourceLinkRequest(datasource="test_dso1", datasource_field="dso_field3")],
+            ),
+        ],
+    )
+]
+
+
+composite_model_update_list = [
+    CompositeEditRequestModel(
+        labels=[
+            Label(
+                language="ru-ru",
+                type=LabelType.SHORT,
+                text="test",
+            ),
+            Label(
+                language="ru-ru",
+                type=LabelType.SHORT,
+                text="test",
+            ),
+            Label(
+                language="ru-ru",
+                type=LabelType.LONG,
+                text="test",
+            ),
+        ],
+        fields=[
+            CompositeFieldRequestModel(
+                name="composite_field3",
+                semantic_type=SemanticType.MEASURE,
+                ref_type=BaseFieldType(
+                    ref_object_type=BaseFieldTypeEnum.ANYFIELD,
+                    ref_object=AnyFieldModel(
+                        name="test_any_field1",
+                        type=AnyFieldTypeEnum.DECIMAL,
+                        precision=12,
+                        scale=7,
+                        aggregation_type=AggregationTypeEnum.MAXIMUM,
+                        labels=[
+                            Label(
+                                language="ru-ru",
+                                type=LabelType.SHORT,
+                                text="test",
+                            )
+                        ],
+                    ),
+                ),
+                datasource_links=[DatasourceLinkRequest(datasource="test_dso1", datasource_field="dso_field3")],
+                labels=[
+                    Label(
+                        language="ru-ru",
+                        type=LabelType.SHORT,
+                        text="test",
+                    )
+                ],
+                sql_name="test",
+            ),
+        ],
+    ),
+    CompositeEditRequestModel(
+        labels=[
+            Label(
+                language="en-en",
+                type=LabelType.SHORT,
+                text="test_composite2",
+            ),
+            Label(
+                language="en-en",
+                type=LabelType.LONG,
+                text="test_composite2",
+            ),
+        ],
+    ),
+]
+
+sql_expressions = [
+    "SELECT `test_schema1`.`test_dso1_distr`.`test_field1_table` as `composite_field1`"
+    + ", `test_schema1`.`test_dso1_distr`.`test_field2_table` as `composite_field2`, "
+    + "`test_schema1`.`test_dso1_distr`.`test_field3_table` as `composite_field3` FROM `test_schema1`.`test_dso1_distr`",
+    "SELECT `test_schema1`.`test_dso1_distr`.`test_field3_table` as `test` FROM `test_schema1`.`test_dso1_distr`",
+    "select * from `test`",
+]
+
+
+@pytest.fixture
+def composites_for_generate_sql(
+    measures: list[Measure], dimensions: list[Dimension], models: list[Model], data_storages: list[DataStorage]
+) -> list[Composite]:
+    return [
+        Composite(
+            version=1,
+            timestamp=datetime(2023, 1, 1, 1, 1, 1, 1),
+            name="test_composite1",
+            tenant_id="tenant1",
+            models=[models[0]],
+            link_type=CompositeLinkTypeEnum.SELECT,
+            labels=[
+                CompositeLabel(
+                    language="ru-ru",
+                    type=LabelType.SHORT,
+                    text="test",
+                ),
+                CompositeLabel(
+                    language="ru-ru",
+                    type=LabelType.LONG,
+                    text="test",
+                ),
+            ],
+            database_objects=[
+                DatabaseObject(
+                    models=[models[0]],
+                    name="test_composite1",
+                    schema_name="test_schema1",
+                    tenant_id="tenant1",
+                    type=DbObjectTypeEnum.VIEW,
+                    specific_attributes=[],
+                ),
+            ],
+            datasources=[
+                CompositeDatasource(
+                    datastorage_datasource=data_storages[0],
+                    type=CompositeFieldRefObjectEnum.DATASTORAGE,
+                )
+            ],
+            fields=[
+                CompositeField(
+                    name="composite_field1",
+                    semantic_type=SemanticType.MEASURE,
+                    field_type=BaseFieldTypeEnum.MEASURE,
+                    labels=[
+                        CompositeFieldLabel(
+                            language="ru-ru",
+                            type=LabelType.SHORT,
+                            text="test",
+                        )
+                    ],
+                    measure=measures[0],
+                    datasource_links=[
+                        DatasourceLink(
+                            data_storage_field_ref=data_storages[0].fields[0],
+                            datasource_type=CompositeFieldRefObjectEnum.DATASTORAGE,
+                        )
+                    ],
+                ),
+                CompositeField(
+                    name="composite_field2",
+                    semantic_type=SemanticType.DIMENSION,
+                    field_type=BaseFieldTypeEnum.DIMENSION,
+                    labels=[
+                        CompositeFieldLabel(
+                            language="ru-ru",
+                            type=LabelType.SHORT,
+                            text="test",
+                        )
+                    ],
+                    dimension=dimensions[0],
+                    datasource_links=[
+                        DatasourceLink(
+                            data_storage_field_ref=data_storages[0].fields[1],
+                            datasource_type=CompositeFieldRefObjectEnum.DATASTORAGE,
+                        )
+                    ],
+                ),
+                CompositeField(
+                    name="composite_field3",
+                    semantic_type=SemanticType.MEASURE,
+                    field_type=BaseFieldTypeEnum.ANYFIELD,
+                    labels=[
+                        CompositeFieldLabel(
+                            language="ru-ru",
+                            type=LabelType.SHORT,
+                            text="test",
+                        )
+                    ],
+                    any_field=AnyField(
+                        name="test_any_field1",
+                        type=AnyFieldTypeEnum.DECIMAL,
+                        precision=12,
+                        scale=1,
+                        aggregation_type=AggregationTypeEnum.MAXIMUM,
+                        labels=[
+                            AnyFieldLabel(
+                                language="ru-ru",
+                                type=LabelType.SHORT,
+                                text="test",
+                            )
+                        ],
+                    ),
+                    datasource_links=[
+                        DatasourceLink(
+                            data_storage_field_ref=data_storages[0].fields[2],
+                            datasource_type=CompositeFieldRefObjectEnum.DATASTORAGE,
+                        )
+                    ],
+                ),
+            ],
+        ),
+        Composite(
+            version=1,
+            timestamp=datetime(2023, 1, 1, 1, 1, 1, 1),
+            name="test_composite2",
+            tenant_id="tenant1",
+            models=[models[0]],
+            link_type=CompositeLinkTypeEnum.INNER_JOIN,
+            labels=[],
+            database_objects=[
+                DatabaseObject(
+                    models=[models[0]],
+                    name="test_composite2",
+                    schema_name="test_schema1",
+                    tenant_id="tenant1",
+                    type=DbObjectTypeEnum.VIEW,
+                    specific_attributes=[],
+                ),
+            ],
+            datasources=[
+                CompositeDatasource(
+                    datastorage_datasource=data_storages[0],
+                    type=CompositeFieldRefObjectEnum.DATASTORAGE,
+                )
+            ],
+            fields=[
+                CompositeField(
+                    name="composite_field1",
+                    semantic_type=SemanticType.MEASURE,
+                    field_type=BaseFieldTypeEnum.MEASURE,
+                    labels=[
+                        CompositeFieldLabel(
+                            language="ru-ru",
+                            type=LabelType.SHORT,
+                            text="test",
+                        )
+                    ],
+                    measure=measures[0],
+                    datasource_links=[
+                        DatasourceLink(
+                            data_storage_field_ref=data_storages[0].fields[0],
+                            datasource_type=CompositeFieldRefObjectEnum.DATASTORAGE,
+                        )
+                    ],
+                ),
+                CompositeField(
+                    name="composite_field2",
+                    semantic_type=SemanticType.DIMENSION,
+                    field_type=BaseFieldTypeEnum.DIMENSION,
+                    labels=[
+                        CompositeFieldLabel(
+                            language="ru-ru",
+                            type=LabelType.SHORT,
+                            text="test",
+                        )
+                    ],
+                    dimension=dimensions[0],
+                    datasource_links=[
+                        DatasourceLink(
+                            data_storage_field_ref=data_storages[0].fields[1],
+                            datasource_type=CompositeFieldRefObjectEnum.DATASTORAGE,
+                        )
+                    ],
+                ),
+                CompositeField(
+                    name="composite_field3",
+                    semantic_type=SemanticType.MEASURE,
+                    field_type=BaseFieldTypeEnum.ANYFIELD,
+                    labels=[
+                        CompositeFieldLabel(
+                            language="ru-ru",
+                            type=LabelType.SHORT,
+                            text="test",
+                        )
+                    ],
+                    any_field=AnyField(
+                        name="test_any_field1",
+                        type=AnyFieldTypeEnum.DECIMAL,
+                        precision=12,
+                        scale=1,
+                        aggregation_type=AggregationTypeEnum.MAXIMUM,
+                        labels=[
+                            AnyFieldLabel(
+                                language="ru-ru",
+                                type=LabelType.SHORT,
+                                text="test",
+                            )
+                        ],
+                    ),
+                    datasource_links=[
+                        DatasourceLink(
+                            data_storage_field_ref=data_storages[0].fields[2],
+                            datasource_type=CompositeFieldRefObjectEnum.DATASTORAGE,
+                        )
+                    ],
+                ),
+            ],
+        ),
+    ]

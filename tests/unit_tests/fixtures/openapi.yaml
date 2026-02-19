@@ -1,0 +1,3877 @@
+openapi: 3.0.0
+info:
+  title: V0 Semantic layer API
+  version: 1.0.11
+  contact:
+    name: Андрей Абакин
+    url: https://addressbook/search/profile/1763632
+    email: abakin.a.v@sberbank.ru
+  description: Semantic layer API for EPMPlatform
+servers:
+  - url: https://ci00163863-epmp-sndbx.apps.dev-terra000004-idm.ocp.delta.sbrf.ru
+    description: DEV стенд
+  - url: https://ci04763767-semlayer.apps.ift-terra000039-edb.ocp.delta.sbrf.ru
+    description: IFT стенд
+paths:
+  /api/internal/health_сheck:
+    get:
+      tags:
+        - internal
+      summary: Health Check
+      operationId: healthCheckApiInternalHhealthCheckGet
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: string
+                pattern: "ok"
+  /api/internal/semanticPermissions:
+    get:
+      tags:
+        - internal
+      summary: Get Semantic Permissions
+      operationId: getSemanticPermissions
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 1000
+                items:
+                  $ref: "#/components/schemas/permission"
+  /api/internal/{dimensionName}/getValues:
+    post:
+      requestBody:
+        description: Фильтр
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/valuesFiltersRequest"
+      parameters:
+        - example: 1
+          name: page
+          description: Страница (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationPageCount"
+          in: query
+          required: false
+        - example: 20
+          name: pageSize
+          description: Количество строк (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationRowCount"
+          in: query
+          required: false
+      tags:
+        - internal
+      summary: Get dimension values from MDM
+      operationId: getValues
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/valuesDimensionResponse"
+                    maxItems: 10000
+                  pagination:
+                    $ref: "#/components/schemas/pagination"
+                required:
+                  - data
+    parameters:
+      - $ref: "#/components/parameters/dimensionName"
+  /api/internal/tenants/{tenantName}/changeObjectStatus:
+    post:
+      tags:
+        - internal
+      summary: Change object status in Model
+      operationId: changeObjectStatusInModel
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/objectStatus"
+              maxItems: 1000
+              uniqueItems: true
+      responses:
+        "200":
+          description: Изменение статуса объекта в модели
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/respObjectStatus"
+    parameters:
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/:
+    get:
+      parameters:
+        - example: 1
+          name: page
+          description: Страница (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationPageCount"
+          in: query
+          required: false
+        - example: 20
+          name: pageSize
+          description: Количество строк (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationRowCount"
+          in: query
+          required: false
+        - name: sortDirection
+          description: Направление сортировки
+          schema:
+            $ref: "#/components/schemas/sortDirection"
+          in: query
+          required: false
+      tags:
+        - v0
+      summary: Get all tenants
+      operationId: getTenants
+      responses:
+        "200":
+          description: Список всех тенантов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/tenant"
+                maxItems: 1000
+                uniqueItems: true
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    post:
+      tags:
+        - v0
+      summary: Create tenant
+      operationId: createTenant
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/tenant"
+          description: Тенант создан
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Тенант уже существует
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/tenant"
+        description: New tenant
+  /api/v0/tenants/{tenantName}:
+    get:
+      tags:
+        - v0
+      summary: Get tenant by name
+      operationId: getTenantByName
+      responses:
+        "200":
+          description: Тенант найден
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/tenant"
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    delete:
+      tags:
+        - v0
+      summary: Delete tenant by name
+      operationId: deleteTenantByName
+      responses:
+        "200":
+          description: Тенант `tenantName` удалена
+        "404":
+          description: Тенант `tenantName` не найден
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    patch:
+      tags:
+        - v0
+      summary: Change tenant by name
+      operationId: changeTenantByName
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/tenant"
+          description: Тенант `tenantName` изменен
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Тенант `tenantName` не найден
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/tenantEdit"
+    parameters:
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/search/objects:
+    get:
+      parameters:
+        - example: 1
+          name: page
+          description: Страница (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationPageCount"
+          in: query
+          required: false
+        - example: 20
+          name: pageSize
+          description: Количество строк (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationRowCount"
+          in: query
+          required: false
+        - name: sortDirection
+          description: Направление сортировки
+          schema:
+            $ref: "#/components/schemas/sortDirection"
+          in: query
+          required: false
+        - name: query
+          description: Поиск фрагмент технического имени или описания
+          schema:
+            $ref: "#/components/schemas/searchQuery"
+          in: query
+          required: True
+        - name: type
+          description: Тип объекта для фильтрации
+          schema:
+            $ref: "#/components/schemas/searchType"
+          in: query
+          required: false
+        - name: modelName
+          description: Имя модели для фильтрации
+          schema:
+            $ref: "#/components/schemas/modelName"
+          in: query
+          required: false
+      tags:
+        - v0
+      summary: search for objects
+      operationId: searchObjects
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/searchResponse"
+                maxItems: 1000
+                uniqueItems: true
+          description: Результаты поиска
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Тенант или модель не найдена
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    parameters:
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/models/{modelName}/search/objectsLinks/{objectName}:
+    get:
+      parameters:
+        - example: as_fp
+          name: name
+          description: Техническое имя объекта
+          schema:
+            $ref: "#/components/schemas/objectName64"
+          in: query
+          required: true
+        - name: type
+          description: Тип объекта для фильтрации
+          schema:
+            $ref: "#/components/schemas/searchType"
+          in: query
+          required: false
+      tags:
+        - v0
+      summary: search for objects links
+      operationId: searchObjectsLinks
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/objectLinks"
+          description: Результаты поиска
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Связь не найдена
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    parameters:
+      - $ref: "#/components/parameters/tenantName"
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/objectName"
+  /api/v0/tenants/{tenantName}/databases/:
+    get:
+      parameters:
+        - example: 1
+          name: page
+          description: Страница (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationPageCount"
+          in: query
+          required: false
+        - example: 20
+          name: pageSize
+          description: Количество строк (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationRowCount"
+          in: query
+          required: false
+        - name: sortDirection
+          description: Направление сортировки
+          schema:
+            $ref: "#/components/schemas/sortDirection"
+          in: query
+          required: false
+      tags:
+        - v0
+      summary: Get all databases
+      operationId: getDatabases
+      responses:
+        "200":
+          description: Список всех баз данных
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/database"
+                maxItems: 1000
+                uniqueItems: true
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    post:
+      tags:
+        - v0
+      summary: Create database
+      operationId: createDatabase
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/database"
+          description: База данных создана
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: База данных уже существует
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/database"
+        description: New database
+    parameters:
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/databases/{databaseName}:
+    get:
+      tags:
+        - v0
+      summary: Get database by name
+      operationId: getDatabaseByName
+      responses:
+        "200":
+          description: |
+            База данных `databaseName` - необходимые параметры подключения 
+            - тип базы данных
+            - хост базы данных 
+            - порт
+            - протокол подключения
+            - SQL диалект
+            - Флаг защищённости подключения
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/database"
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    delete:
+      tags:
+        - v0
+      summary: Delete database by name
+      operationId: deleteDatabaseByName
+      responses:
+        "200":
+          description: База данных `databaseName` удалена
+        "404":
+          description: База данных `databaseName` не найдена
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    patch:
+      tags:
+        - v0
+      summary: Change database by name
+      operationId: changeDatabaseByName
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/database"
+          description: База данных `databaseName` изменена
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: База данных `databaseName` не найдена
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/databaseEdit"
+    parameters:
+      - $ref: "#/components/parameters/databaseName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/models/:
+    get:
+      parameters:
+        - example: 1
+          name: page
+          description: Страница (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationPageCount"
+          in: query
+          required: false
+        - example: 20
+          name: pageSize
+          description: Количество строк (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationRowCount"
+          in: query
+          required: false
+        - name: sortDirection
+          description: Направление сортировки
+          schema:
+            $ref: "#/components/schemas/sortDirection"
+          in: query
+          required: false
+      tags:
+        - v0
+      summary: Get all models
+      operationId: getModels
+      responses:
+        "200":
+          description: Список всех моделей
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/model"
+                maxItems: 1000
+                uniqueItems: true
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    post:
+      tags:
+        - v0
+      summary: Create model
+      operationId: createModel
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/model"
+          description: Модель создана
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Модель уже существует
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/model"
+        description: New model
+    parameters:
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/models/{modelName}:
+    get:
+      tags:
+        - v0
+      summary: Get model by name
+      operationId: getModelByName
+      responses:
+        "200":
+          description: |
+            Модель `modelName` - совокупность 
+            - признаков
+            - показателей 
+            - хранилищ
+            - композитов
+            - других объектов
+            принадлежащей одной области системы
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/model"
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    delete:
+      tags:
+        - v0
+      summary: Delete model by name
+      operationId: deleteModelByName
+      responses:
+        "200":
+          description: Модель `modelName` удалена
+        "404":
+          description: Модель `modelName` не найдена
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    patch:
+      tags:
+        - v0
+      summary: Change model
+      operationId: changeModelByName
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/model"
+          description: Модель `modelName` изменена
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Модель `modelName` не найдена
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/modelEdit"
+    parameters:
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/models/{modelName}/synchronization/dataStorages:
+    post:
+      tags:
+        - v0
+      summary: Create data storages In Database From Meta
+      operationId: createDataStoragesInDatabaseFromMeta
+      responses:
+        "200":
+          description: Обновленные модели
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/synchronizationResult"
+                maxItems: 1000
+                uniqueItems: true
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/httpValidationError"
+    parameters:
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/tenantName"
+      - $ref: "#/components/parameters/checkPossibleToDropMode"
+  /api/v0/tenants/{tenantName}/models/{modelName}/synchronization/dataStorages/{dataStorageName}:
+    post:
+      tags:
+        - v0
+      summary: Create data storages In Database From Meta
+      operationId: createDataStorageInDatabaseFromMeta
+      responses:
+        "200":
+          description: Обновленная таблица
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/synchronizationResult"
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/httpValidationError"
+    parameters:
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/tenantName"
+      - $ref: "#/components/parameters/dataStorageName"
+  /api/v0/tenants/{tenantName}/models/{modelName}/synchronization/composites/:
+    post:
+      tags:
+        - v0
+      summary: Create Composites In Database From Meta
+      operationId: createCompositesInDatabaseFromMeta
+      description: Обновить все view в базе данных
+      responses:
+        "200":
+          description: Обновленные view
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/respCopyObject"
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/httpValidationError"
+    parameters:
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/models/{modelName}/synchronization/composites/{compositeName}:
+    post:
+      tags:
+        - v0
+      summary: Create Composite In Database From Meta
+      operationId: createCompositeInDatabaseFromMeta
+      description: Обновить view в базе данных
+      responses:
+        "200":
+          description: Обновленные view
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/synchronizationResult"
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/httpValidationError"
+    parameters:
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/tenantName"
+      - $ref: "#/components/parameters/compositeName"
+  /api/v0/tenants/{tenantName}/dimensions/copyToAnotherModel:
+    post:
+      tags:
+        - v0
+      summary: Copy dimension to another model
+      operationId: copyDimensionToAnotherModel
+      description: New model for dimension
+      parameters:
+        - $ref: "#/components/parameters/tenantName"
+        - $ref: "#/components/parameters/copyAttributes"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/requestCopyObject"
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/respCopyObject"
+          description: Измерение создано в указанных моделях
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/httpValidationError"
+          description: Измерение уже существует в модели `modelName`
+  /api/v0/tenants/{tenantName}/models/{modelName}/dimensions/create:
+    post:
+      tags:
+        - v0
+      summary: Create dimension by model name
+      operationId: createDimensionByModelName
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/dimension"
+          description: Измерение создано в модели `modelName`
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Измерение уже существует в модели `modelName`
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      parameters:
+        - $ref: "#/components/parameters/modelName"
+        - $ref: "#/components/parameters/tenantName"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/dimension"
+        description: New dimension
+  /api/v0/tenants/{tenantName}/models/{modelName}/dimensions/:
+    get:
+      parameters:
+        - example: 1
+          name: page
+          description: Страница (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationPageCount"
+          in: query
+          required: false
+        - example: 20
+          name: pageSize
+          description: Количество строк (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationRowCount"
+          in: query
+          required: false
+        - name: sortDirection
+          description: Направление сортировки
+          schema:
+            $ref: "#/components/schemas/sortDirection"
+          in: query
+          required: false
+      tags:
+        - v0
+      summary: Get dimensions by model name
+      operationId: getDimensionsByModelName
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/dimension"
+                maxItems: 1000
+                uniqueItems: true
+          description: Все измерения модели `modelName`
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    post:
+      tags:
+        - v0
+      summary: Get dimensions by model name and dimension name
+      operationId: getDimensionsByModelNameAndDimensionsName
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/dimension"
+                maxItems: 1000
+                uniqueItems: true
+          description: Измерения модели `modelName` по списку `dimensionNames`
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        description: Список идентификаторов измерений модели `modelName`
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/dimensionName"
+              maxItems: 1000
+              uniqueItems: true
+    parameters:
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/models/{modelName}/dimensions/{dimensionName}:
+    get:
+      tags:
+        - v0
+      summary: Get dimension by model name and dimension name
+      operationId: getDimensionByModelNameAndDimensionName
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/dimension"
+          description: Измерение `dimensionName` модели `modelName`
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Не найдено измерение `dimensionName` модели `modelName`
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    delete:
+      tags:
+        - v0
+      summary: Delete dimension by model name and dimension name
+      operationId: deleteDimensionByModelNameAndDimensionName
+      responses:
+        "200":
+          description: Измерение `dimensionName` модели `modelName` удалено
+        "404":
+          description: Измерение `dimensionName` модели `modelName` не найдено
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    patch:
+      tags:
+        - v0
+      summary: Change dimension
+      operationId: changeDimensionByModelNameAndDimensionName
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/dimension"
+          description: Измерение `dimensionName` модели `modelName` изменено
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Измерение `dimensionName` модели `modelName` не найдено
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/dimensionEdit"
+    parameters:
+      - $ref: "#/components/parameters/dimensionName"
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/aiGroups/create:
+    post:
+      tags:
+        - v0
+      summary: Create ai group by tenant name
+      operationId: createAiGroupByTenantName
+      description: Создание ai группы
+      requestBody:
+        description: Параметры новой ai группы
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/aiGroupNew"
+      responses:
+        "201":
+          description: AI группа создана в тенанте `tenantName`
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/aiGroup"
+        "409":
+          description: AI группа уже существует в тенанте `tenantName`
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+        "422":
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/httpValidationError"
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      parameters:
+        - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/aiGroups/:
+    get:
+      tags:
+        - v0
+      summary: Get all ai groups by tenant name
+      operationId: getAiGroupsByTenantName
+      parameters:
+        - example: 1
+          name: page
+          description: Страница (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationPageCount"
+          in: query
+          required: false
+        - example: 20
+          name: pageSize
+          description: Количество строк (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationRowCount"
+          in: query
+          required: false
+        - name: sortDirection
+          description: Направление сортировки
+          schema:
+            $ref: "#/components/schemas/sortDirection"
+          in: query
+          required: false
+      responses:
+        "200":
+          description: Все AI группы тенанта `tenantName`
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/aiGroup"
+                maxItems: 1000
+                uniqueItems: true
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    parameters:
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/aiGroups/{groupId}:
+    get:
+      tags:
+        - v0
+      summary: Get ai group by tenant name
+      operationId: getAiGroupByTenantName
+      description: Получение свойств ai группы
+      responses:
+        "200":
+          description: AI группа `aiGroup` тенанта `tenantName`
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/aiGroup"
+        "404":
+          description: AI группа `aiGroup` тенанта `tenantName` не найдена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    delete:
+      tags:
+        - v0
+      summary: Delete ai group by tenant name
+      operationId: deleteAiGroupByTenantName
+      responses:
+        "204":
+          description: AI группа `aiGroup` тенанта `tenantName` удалена
+        "404":
+          description: AI группа `aiGroup` тенанта `tenantName` не найдена
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    patch:
+      tags:
+        - v0
+      summary: Change ai group by tenant name
+      operationId: changeAiGroupByTenantName
+      responses:
+        "200":
+          description: AI группа `aiGroup` тенанта `tenantName` изменена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/aiGroup"
+        "404":
+          description: AI группа `aiGroup` тенанта `tenantName` не найдена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+        "422":
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/httpValidationError"
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/aiGroupEdit"
+    parameters:
+      - $ref: "#/components/parameters/groupId"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/models/{modelName}/measures/:
+    get:
+      parameters:
+        - example: 1
+          name: page
+          description: Страница (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationPageCount"
+          in: query
+          required: false
+        - example: 20
+          name: pageSize
+          description: Количество строк (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationRowCount"
+          in: query
+          required: false
+        - name: sortDirection
+          description: Направление сортировки
+          schema:
+            $ref: "#/components/schemas/sortDirection"
+          in: query
+          required: false
+      tags:
+        - v0
+      summary: Get all measures by model name
+      operationId: getMeasuresByModelName
+      responses:
+        "200":
+          description: Все показатели модели `modelName`
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/measure"
+                maxItems: 1000
+                uniqueItems: true
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    post:
+      tags:
+        - v0
+      summary: Get measures by model name and measure name
+      operationId: getMeasuresByModelNameAndMeasureNames
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/measure"
+                maxItems: 1000
+                uniqueItems: true
+          description: Показатели модели `modelName` по списку `measureNames`
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Показатели не найдены в модели `modelName`
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/measureName"
+              maxItems: 1000
+              uniqueItems: true
+        description: New measure
+    parameters:
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/measures/copyToAnotherModel:
+    post:
+      tags:
+        - v0
+      summary: Copy measure to another model
+      operationId: copyMeasureToAnotherModel
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/respCopyObject"
+          description: Измерение создано в указанных моделях
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/httpValidationError"
+          description: Измерение уже существует в модел `modelName`
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/requestCopyObject"
+      description: New model for measure
+    parameters:
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/models/{modelName}/measures/create:
+    post:
+      tags:
+        - v0
+      summary: Create measure by model name
+      operationId: createMeasureByModelName
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/measure"
+          description: Показатель создан в модели `modelName`
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Показатель уже существует в модели `modelName`
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/measure"
+        description: New measure
+    parameters:
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/models/{modelName}/measures/{measureName}:
+    get:
+      tags:
+        - v0
+      summary: Get measure by model name and measure name
+      operationId: getMeasureByModelNameAndMeasureName
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/measure"
+          description: Показатель `measureName` модели `modelName`
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Не найден показатель `measureName` модели `modelName`
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    delete:
+      tags:
+        - v0
+      summary: Delete measure by model name and measure name
+      operationId: deleteMeasureByModelNameAndMeasureName
+      responses:
+        "200":
+          description: Показатель `measureName` модели `modelName` удален
+        "404":
+          description: Показатель `measureName` модели `modelName` не найден
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    patch:
+      tags:
+        - v0
+      summary: Change measure by model name and measure name
+      operationId: changeMeasureByModelNameAndMeasureName
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/measure"
+          description: Показатель `measureName` модели `modelName` изменен
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Показатель `measureName` модели `modelName` не найден
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/measureEdit"
+    parameters:
+      - $ref: "#/components/parameters/measureName"
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/models/{modelName}/hierarchies/:
+    get:
+      tags:
+        - v0
+      summary: Get all hierarchies by model name
+      operationId: getHierarchiesByModelName
+      parameters:
+        - example: 1
+          name: page
+          description: Страница (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationPageCount"
+          in: query
+          required: false
+        - example: 20
+          name: pageSize
+          description: Количество строк (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationRowCount"
+          in: query
+          required: false
+        - name: sortDirection
+          description: Направление сортировки
+          schema:
+            $ref: "#/components/schemas/sortDirection"
+          in: query
+          required: false
+      responses:
+        "200":
+          description: Все иерархии модели `modelName`
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/hierarchy"
+                maxItems: 1000
+                uniqueItems: true
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Иерархии модели `modelName` не найдены
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    post:
+      tags:
+        - v0
+      summary: Get hierarchies by model name and hierarchy name
+      operationId: getHierarchiesByModelNameAndHierarchiesName
+      requestBody:
+        description: Список идентификаторов иерархий модели `modelName`
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/hierarchyName"
+              maxItems: 1000
+              uniqueItems: true
+      responses:
+        "200":
+          description: Все иерархии модели `modelName`
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/hierarchy"
+                maxItems: 1000
+                uniqueItems: true
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Иерархии `hierarchyName` модели `modelName` не найдены
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    parameters:
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/models/{modelName}/dimensions/{dimensionName}/hierarchies/{hierarchyName}:
+    get:
+      tags:
+        - v0
+      summary: Get hierarchy by model name, dimension name and hierarchy name
+      operationId: getHierarchyByModelNameDimensionNameAndHierarchyName
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/hierarchy"
+          description: Иерархия `hierarchyName` модели `modelName`
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Иерархия `hierarchyName` модели `modelName` не найдена
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    delete:
+      tags:
+        - v0
+      summary: Delete hierarchy by model name, dimension name and hierarchy name
+      operationId: deleteHierarchyByModelNameDimensionNameAndHierarchyName
+      responses:
+        "204":
+          description: Иерархия `hierarchyName` модели `modelName` удалена
+        "404":
+          description: Иерархия `hierarchyName` модели `modelName` не найдена
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    patch:
+      tags:
+        - v0
+      summary: Change hierarchy by model name, dimension name and hierarchy name
+      operationId: changeHierarchyByModelNameDimensionNameAndHierarchyName
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/hierarchyEdit"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/hierarchy"
+          description: Иерархия `hierarchyName` модели `modelName` изменена
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Иерархия `hierarchyName` модели `modelName` не найдена
+        "422":
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/httpValidationError"
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    parameters:
+      - $ref: "#/components/parameters/hierarchyName"
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/dimensionName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/models/{modelName}/dimensions/{dimensionName}/hierarchies/:
+    get:
+      parameters:
+        - example: 1
+          name: page
+          description: Страница (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationPageCount"
+          in: query
+          required: false
+        - example: 20
+          name: pageSize
+          description: Количество строк (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationRowCount"
+          in: query
+          required: false
+        - name: sortDirection
+          description: Направление сортировки
+          schema:
+            $ref: "#/components/schemas/sortDirection"
+          in: query
+          required: false
+      tags:
+        - v0
+      summary: Get hierarchies by model name and dimension name
+      operationId: getHierarchiesByModelNameAndDimensionName
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/hierarchy"
+                maxItems: 1000
+                uniqueItems: true
+          description: Иерархия `hierarchyName` модели `modelName`
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Не найдены иерархии `hierarchyName` модели `modelName` базового измерения `dimensionName`
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    post:
+      tags:
+        - v0
+      summary: Get hierarchies by model name, dimension name and hierarchy name
+      operationId: getHierarchiesByModelNameAndDimensionNameAndHierarchyName
+      requestBody:
+        description: Список идентификаторов измерений модели `modelName`
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/hierarchyName"
+              maxItems: 1000
+              uniqueItems: true
+      responses:
+        "200":
+          description: Иерархии модели `modelName` базового измерения `dimensionName` по списку `HierarchyNames`
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/hierarchy"
+                maxItems: 1000
+                uniqueItems: true
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Не найдены иерархии `hierarchyName` модели `modelName` базового измерения `dimensionName`
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    parameters:
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/dimensionName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/models/{modelName}/dimensions/{dimensionName}/hierarchies/create:
+    post:
+      tags:
+        - v0
+      summary: Create hierarchy by model name and dimension name
+      operationId: createHierarchyByModelNameAndDimensionName
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/hierarchyNew"
+        description: New hierarchy
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/hierarchy"
+          description: Иерархия создана в модели `modelName`
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Иерархия уже существует в модели `modelName`
+        "422":
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/httpValidationError"
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    parameters:
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/dimensionName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/models/{modelName}/hierarchies/byDimensions/:
+    post:
+      tags:
+        - v0
+      summary: Get hierarchies by model name and dimension names
+      operationId: getHierarchiesByModelNameAndDimensionNames
+      responses:
+        "200":
+          description: Все иерархии измерений `dimensionNames` модели `modelName`
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/hierarchy"
+                maxItems: 1000
+                uniqueItems: true
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Не найдены иерархии `hierarchyName` модели `modelName`
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        description: Список имен иерархий модели `modelName`
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/hierarchyName"
+              maxItems: 1000
+              uniqueItems: true
+    parameters:
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/hierarchies/copyToAnotherModel:
+    post:
+      tags:
+        - v0
+      summary: Copy hierarchy to another model
+      operationId: copyHierarchyToAnotherModel
+      parameters:
+        - $ref: "#/components/parameters/tenantName"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/requestCopyObject"
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/respCopyObject"
+          description: Иерархия создана в указанных моделях
+        "409":
+          description: |
+            Конфликт. Возможные причины:
+            1) Иерархия уже существует в модели
+            2) Необходимые измерения для иерархии не существуют в модели
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+  /api/v0/tenants/{tenantName}/models/{modelName}/dataStorages/{dataStorageName}:
+    get:
+      tags:
+        - v0
+      summary: Get data storage by model name and data storage name
+      operationId: getDataStorageByModelNameAndDataStorageName
+      responses:
+        "200":
+          description: Хранилище `dataStorageName` модели `modelName`
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/dataStorage"
+        "404":
+          description: No DSO found in Semantic model for the provided `dataStorageName`
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    delete:
+      tags:
+        - v0
+      summary: Delete data storage by model name and data storage name
+      operationId: deleteDataStorageByModelNameAndDataStorageName
+      responses:
+        "200":
+          description: Data storage `dataStorageName` в модели `modelName` удалено
+        "404":
+          description: Data storage `dataStorageName` в модели `modelName` не найдено
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    patch:
+      tags:
+        - v0
+      summary: Change data storage
+      operationId: changeDataStorageByModelNameAndDataStorageName
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/dataStorage"
+          description: Data storage `dataStorageName` в модели `modelName` изменен
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Data storage `dataStorageName` в модели `modelName` не найден
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/dataStorageEdit"
+    parameters:
+      - $ref: "#/components/parameters/dataStorageName"
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/models/{modelName}/dataStorages/:
+    get:
+      parameters:
+        - example: 1
+          name: page
+          description: Страница (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationPageCount"
+          in: query
+          required: false
+        - example: 20
+          name: pageSize
+          description: Количество строк (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationRowCount"
+          in: query
+          required: false
+        - name: sortDirection
+          description: Направление сортировки
+          schema:
+            $ref: "#/components/schemas/sortDirection"
+          in: query
+          required: false
+        - $ref: "#/components/parameters/dataStorageType"
+      tags:
+        - v0
+      summary: Get all data storages by model name
+      operationId: getDataStoragesByModelName
+      responses:
+        "200":
+          description: Описание хранилища `DimensionName` в модели `modelName`
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/dataStorage"
+                maxItems: 1000
+                uniqueItems: true
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    post:
+      tags:
+        - v0
+      summary: Create Data Storage by model name
+      operationId: createDataStorageByModelName
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/dataStorage"
+          description: Data Storage создано в модели `modelName`
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Data Storage уже существует в модели `modelName`
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/dataStorage"
+        description: New dataStorage
+    parameters:
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/models/{modelName}/dataStorages/byDbObject:
+    post:
+      tags:
+        - v0
+      summary: Get dataStorages by model name and databaseObjects
+      operationId: getdataStoragesByModelNameAndDataObject
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/dataStorage"
+          description: Хранилище данных модели `modelName` по объекту БД
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        description: Объект БД
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/dbObjectForSearch"
+    parameters:
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/dataStorages/copyToAnotherModel:
+    post:
+      tags:
+        - v0
+      summary: Copy data storages to another model
+      operationId: copyDataStoragesToAnotherModel
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/respCopyStorage"
+          description: Хранилище данных создано в указанных моделях
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/httpValidationError"
+          description: Хранилище данных уже существует в модели `modelName`
+      parameters:
+        - $ref: "#/components/parameters/tenantName"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/requestCopyStorage"
+        description: New model for data storage
+  /api/v0/tenants/{tenantName}/models/{modelName}/composites/:
+    get:
+      parameters:
+        - example: 1
+          name: page
+          description: Страница (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationPageCount"
+          in: query
+          required: false
+        - example: 20
+          name: pageSize
+          description: Количество строк (параметр пагинации)
+          schema:
+            $ref: "#/components/schemas/paginationRowCount"
+          in: query
+          required: false
+        - name: sortDirection
+          description: Направление сортировки
+          schema:
+            $ref: "#/components/schemas/sortDirection"
+          in: query
+          required: false
+      tags:
+        - v0
+      summary: Get all composites by model name
+      operationId: getCompositesByModelName
+      responses:
+        "200":
+          description: Все композиты модели `modelName`
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/compositeGet"
+                maxItems: 1000
+                uniqueItems: true
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    post:
+      tags:
+        - v0
+      summary: Create composite by model name
+      operationId: createCompositeByModelName
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/compositeGet"
+          description: Композит создан в модели `modelName`
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Композит уже существует в модели `modelName`
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/composite"
+        description: New composite
+    parameters:
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/models/{modelName}/composites/{compositeName}:
+    get:
+      tags:
+        - v0
+      summary: Get composite by model name and composite name
+      operationId: getCompositeByModelNameAndCompositeName
+      responses:
+        "200":
+          description: Описание композита с именем `compositeName`
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/compositeGet"
+        "404":
+          description: Не найден композит с именем `compositeName`
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    delete:
+      tags:
+        - v0
+      summary: Delete composite by model name and composite name
+      operationId: deleteCompositeByModelNameAndCompositeName
+      responses:
+        "200":
+          description: Композит `compositeName` в модели `modelName` удален
+        "404":
+          description: Композит `compositeName` в модели `modelName` не найден
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+    patch:
+      tags:
+        - v0
+      summary: Change composite by model name and composite name
+      operationId: changeCompositeByModelNameAndCompositeName
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/compositeGet"
+          description: Композит `compositeName` в модели `modelName` изменен
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+          description: Композит `compositeName` в модели `modelName` не найден
+        "500":
+          $ref: "#/components/responses/unexpectedError"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/compositeEdit"
+    parameters:
+      - $ref: "#/components/parameters/compositeName"
+      - $ref: "#/components/parameters/modelName"
+      - $ref: "#/components/parameters/tenantName"
+  /api/v0/tenants/{tenantName}/composites/copyToAnotherModel:
+    post:
+      tags:
+        - v0
+      summary: Copy composite to another model
+      operationId: copyCompositeToAnotherModel
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/respCopyObject"
+          description: Измерение создано в указанных моделях
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/httpValidationError"
+          description: Измерение уже существует в модел `modelName`
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/requestCopyObject"
+      description: New model for measure
+    parameters:
+      - $ref: "#/components/parameters/tenantName"
+components:
+  responses:
+    unexpectedError:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/error"
+  parameters:
+    modelName:
+      name: modelName
+      description: Уникальный идентификатор модели
+      schema:
+        $ref: "#/components/schemas/modelName"
+      in: path
+      required: true
+    databaseName:
+      name: databaseName
+      description: Уникальный идентификатор базы данных
+      schema:
+        $ref: "#/components/schemas/databaseName"
+      in: path
+      required: true
+    dimensionName:
+      name: dimensionName
+      description: Уникальный идентификатор измерения
+      schema:
+        $ref: "#/components/schemas/dimensionName"
+      in: path
+      required: true
+    measureName:
+      name: measureName
+      description: Уникальный идентификатор показателя
+      schema:
+        $ref: "#/components/schemas/measureName"
+      in: path
+      required: true
+    compositeName:
+      name: compositeName
+      description: Уникальный идентификатор композита
+      schema:
+        $ref: "#/components/schemas/compositeName"
+      in: path
+      required: true
+    dataStorageName:
+      name: dataStorageName
+      description: Уникальный идентификатор data storage
+      schema:
+        $ref: "#/components/schemas/dataStorageName"
+      in: path
+      required: true
+    hierarchyName:
+      name: hierarchyName
+      description: Название иерархии
+      schema:
+        $ref: "#/components/schemas/hierarchyName"
+      in: path
+      required: true
+    tenantName:
+      name: tenantName
+      description: Название тенанта
+      schema:
+        $ref: "#/components/schemas/tenantName"
+      in: path
+      required: true
+    objectName:
+      name: objectName
+      description: Техническое имя объекта
+      schema:
+        $ref: "#/components/schemas/objectName64"
+      in: path
+      required: true
+    checkPossibleToDropMode:
+      name: checkPossibleToDropMode
+      description: Строка для проверки возможности удаления модели
+      schema:
+        $ref: "#/components/schemas/checkPossibleToDropMode"
+      in: query
+      required: false
+    copyAttributes:
+      name: copyAttributes
+      description: Копировать с вложенными атрибутами
+      schema:
+        $ref: "#/components/schemas/copyAttributes"
+      in: query
+      required: false
+    groupId:
+      name: groupId
+      description: Идентификатор ai группы
+      schema:
+        $ref: "#/components/schemas/groupId"
+      in: path
+      required: true
+    dataStorageType:
+      name: type
+      description: Тип хранилища данных
+      schema:
+        type: array
+        maxItems: 100
+        uniqueItems: true
+        items:
+          $ref: "#/components/schemas/dataStorageType"
+      in: query
+      required: false
+  schemas:
+    tenantName:
+      $ref: "#/components/schemas/objectName32"
+    dimensionName:
+      $ref: "#/components/schemas/objectName32"
+    hierarchyName:
+      $ref: "#/components/schemas/objectName32"
+    databaseName:
+      $ref: "#/components/schemas/objectName32"
+    compositeName:
+      $ref: "#/components/schemas/objectName32"
+    measureName:
+      $ref: "#/components/schemas/objectName32"
+    dataStorageName:
+      $ref: "#/components/schemas/objectName64"
+    modelName:
+      $ref: "#/components/schemas/objectName32"
+    objectName32:
+      description: Уникальное техническое имя объекта
+      type: string
+      minLength: 1
+      maxLength: 32
+      pattern: "^[a-z0-9_]+$"
+      example: "objectname32"
+    objectName64:
+      description: Уникальное техническое имя объекта
+      type: string
+      minLength: 1
+      maxLength: 64
+      pattern: "^[a-z0-9_]+$"
+      example: "objectname64"
+    objectName255:
+      description: Уникальное техническое имя объекта
+      type: string
+      minLength: 1
+      maxLength: 255
+      pattern: '^[^\n\t]+$'
+      example: "objectname255"
+    tenantEdit:
+      type: object
+      additionalProperties: false
+      properties:
+        labels:
+          $ref: "#/components/schemas/objectLabels"
+        models:
+          type: array
+          items:
+            $ref: "#/components/schemas/modelName"
+          maxItems: 1000
+          uniqueItems: true
+    tenant:
+      allOf:
+        - $ref: "#/components/schemas/tenantEdit"
+        - type: object
+          required:
+            - name
+            - models
+          additionalProperties: false
+          properties:
+            name:
+              $ref: "#/components/schemas/tenantName"
+    dimension:
+      allOf:
+        - $ref: "#/components/schemas/versionInfo"
+        - $ref: "#/components/schemas/dimensionEdit"
+        - type: object
+          required:
+            - name
+          additionalProperties: false
+          properties:
+            name:
+              $ref: "#/components/schemas/dimensionName"
+            valuesTable:
+              $ref: "#/components/schemas/dataStorageName"
+            textTable:
+              $ref: "#/components/schemas/dataStorageName"
+            attributesTable:
+              $ref: "#/components/schemas/dataStorageName"
+            hierarchyVersionsTable:
+              $ref: "#/components/schemas/dataStorageName"
+            hierarchyTextVersionsTable:
+              $ref: "#/components/schemas/dataStorageName"
+            hierarchyNodesTable:
+              $ref: "#/components/schemas/dataStorageName"
+            hierarchyTextNodesTable:
+              $ref: "#/components/schemas/dataStorageName"
+            aorType:
+              $ref: '#/components/schemas/aorType'
+            attributesTimeDependency:
+              type: boolean
+              default: false
+              description: Зависимость атрибутов от времени
+            pvDictionary:
+              $ref: "#/components/schemas/pvDictionary"
+            models:
+              type: array
+              items:
+                $ref: "#/components/schemas/modelName"
+              minItems: 0
+              maxItems: 1000
+              uniqueItems: true
+              description: Массив имен моделей, к которым относится измерение со статусом обработки объекта в них
+            haveHierarchy:
+              type: boolean
+              default: false
+              description: Наличие иерархии
+    schemaName:
+      description: Имя схемы базы данных
+      type: string
+      pattern: "^[a-zA-Z0-9_]+$"
+      minLength: 0
+      maxLength: 255
+      example: "schema_name"
+    specificAttribute:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - value
+      properties:
+        name:
+          description: Имя атрибута
+          type: string
+          example: TYPE
+          pattern: "^[A-Z0-9_]+$"
+          minLength: 1
+          maxLength: 255
+        value:
+          description: Значение атрибута
+          type: string
+          example: DICTIONARY
+          pattern: '^[a-zA-Z0-9_\-\(\).,]+$'
+          minLength: 1
+          maxLength: 255
+    dimensionAttribute:
+      type: object
+      required:
+        - name
+        - type
+        - semanticType
+      additionalProperties: false
+      properties:
+        name:
+          $ref: "#/components/schemas/objectName32"
+        timeDependency:
+          type: boolean
+          description: Зависимость атрибута от времени
+        labels:
+          $ref: "#/components/schemas/objectLabels"
+        semanticType:
+          $ref: "#/components/schemas/semanticType"
+        type:
+          $ref: "#/components/schemas/objectFieldType"
+    anyField:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          $ref: "#/components/schemas/objectName32"
+        labels:
+          $ref: "#/components/schemas/objectLabels"
+        type:
+          description: Технический тип данных поля (состоит из типов измерения и показателя)
+          maxLength: 20
+          enum:
+            - INTEGER
+            - STRING
+            - DATE
+            - ARRAY[INTEGER]
+            - TIME
+            - DATETIME
+            - TIMESTAMP
+            - BOOLEAN
+            - ARRAY[STRING]
+            - JSON
+            - FLOAT
+            - DECIMAL
+            - UUID
+          type: string
+        aggregationType:
+          $ref: "#/components/schemas/aggregationType"
+        precision:
+          description: Overall lenght of data
+          type: integer
+          minimum: 1
+          maximum: 1333
+        scale:
+          description: Number of digits after fpoint
+          type: integer
+          minimum: 0
+          maximum: 34
+    requestCopyObject:
+      type: object
+      additionalProperties: false
+      properties:
+        modelNames:
+          type: array
+          items:
+            $ref: "#/components/schemas/modelName"
+          maxItems: 1000
+          uniqueItems: true
+        objects:
+          type: array
+          items:
+            $ref: "#/components/schemas/objectName32"
+          maxItems: 1000
+          uniqueItems: true
+    requestCopyStorage:
+      type: object
+      additionalProperties: false
+      properties:
+        modelNames:
+          type: array
+          items:
+            $ref: "#/components/schemas/modelName"
+          maxItems: 1000
+          uniqueItems: true
+        objects:
+          type: array
+          items:
+            $ref: "#/components/schemas/dataStorageName"
+          maxItems: 1000
+          uniqueItems: true
+    respCopyObject:
+      type: array
+      maxItems: 1000
+      uniqueItems: true
+      items:
+        type: object
+        additionalProperties: false
+        properties:
+          tenant:
+            $ref: "#/components/schemas/tenantName"
+          objectName:
+            $ref: "#/components/schemas/objectName32"
+          modelNames:
+            type: array
+            items:
+              $ref: "#/components/schemas/modelName"
+            maxItems: 1000
+            uniqueItems: true
+          result:
+            $ref: "#/components/schemas/result"
+          comment:
+            pattern: '^[^\n\t]+$'
+            type: string
+            maxLength: 255
+            description: Комментарий
+    respCopyStorage:
+      type: array
+      maxItems: 1000
+      uniqueItems: true
+      items:
+        type: object
+        additionalProperties: false
+        properties:
+          tenant:
+            $ref: "#/components/schemas/tenantName"
+          objectName:
+            $ref: "#/components/schemas/objectName64"
+          modelNames:
+            type: array
+            items:
+              $ref: "#/components/schemas/modelName"
+            maxItems: 1000
+            uniqueItems: true
+          result:
+            type: string
+            enum:
+              - SUCCESS
+              - FAILURE
+            description: Результат копирования
+          comment:
+            pattern: '^[^\n\t]+$'
+            type: string
+            maxLength: 255
+            description: Комментарий
+    httpValidationError:
+      type: object
+      additionalProperties: false
+      properties:
+        detail:
+          type: array
+          maxItems: 1000
+          uniqueItems: true
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              loc:
+                type: array
+                items:
+                  type: string
+                  maxLength: 255
+                  pattern: '^[^\n\t]+$'
+                maxItems: 1000
+                uniqueItems: true
+              msg:
+                $ref: "#/components/schemas/msg"
+              type:
+                type: string
+                maxLength: 255
+                pattern: '^[^\n\t]+$'
+                description: Тип ошибки
+    hierarchy:
+      allOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - name
+            - structureType
+            - baseDimension
+          properties:
+            name:
+              $ref: "#/components/schemas/hierarchyName"
+            pvDictionary:
+              $ref: "#/components/schemas/pvDictionary"
+            structureType:
+              description: |
+                Тип структуры иерархии
+                - MIXED - расширенная
+                - PARENT_CHILD - родитель-потомок
+                - FLAT - плоская, линейная
+              type: string
+              enum:
+                - MIXED
+                - PARENT_CHILD
+                - FLAT
+            models:
+              type: array
+              description: Модели, использующие иерархию, со статусом обработки объекта в нем
+              items:
+                $ref: "#/components/schemas/modelName"
+              maxItems: 1000
+              minItems: 0
+              uniqueItems: true
+            baseDimension:
+              $ref: "#/components/schemas/dimensionName"
+            dataStorages:
+              type: object
+              description: Группа таблиц в БД для хранения данных по иерархии
+              additionalProperties: false
+              required:
+                - hierarchyVersionsTable
+                - hierarchyTextVersionsTable
+                - hierarchyNodesTable
+                - hierarchyTextNodesTable
+              properties:
+                hierarchyVersionsTable:
+                  $ref: "#/components/schemas/dataStorageName"
+                hierarchyTextVersionsTable:
+                  $ref: "#/components/schemas/dataStorageName"
+                hierarchyNodesTable:
+                  $ref: "#/components/schemas/dataStorageName"
+                hierarchyTextNodesTable:
+                  $ref: "#/components/schemas/dataStorageName"
+        - $ref: "#/components/schemas/hierarchyEdit"
+    error:
+      required:
+        - message
+      type: object
+      additionalProperties: false
+      properties:
+        message:
+          description: A human readable error message
+          type: string
+          pattern: "^[a-zA-Z0-9_]+$"
+          minLength: 1
+          maxLength: 255
+    measure:
+      allOf:
+        - $ref: "#/components/schemas/versionInfo"
+        - $ref: "#/components/schemas/measureEdit"
+        - required:
+            - name
+          type: object
+          additionalProperties: false
+          properties:
+            name:
+              $ref: "#/components/schemas/measureName"
+            aorType:
+              $ref: '#/components/schemas/aorType'
+            models:
+              type: array
+              items:
+                $ref: "#/components/schemas/modelName"
+              maxItems: 1000
+              minItems: 0
+              uniqueItems: true
+              description: Массив имен моделей, к которым относится показатель, со статусом обработки объекта в ней
+    dimensionFilter:
+      type: object
+      additionalProperties: false
+      required:
+        - dimensionName
+      properties:
+        dimensionName:
+          $ref: "#/components/schemas/dimensionName"
+        dimensionValue:
+          description: Значение dimension
+          type: string
+          maxLength: 255
+          pattern: "^[a-zA-Z0-9_]+$"
+    dataStorageField:
+      required:
+        - name
+        - type
+        - isKey
+        - semanticType
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          $ref: "#/components/schemas/objectName32"
+        sqlName:
+          $ref: "#/components/schemas/sqlName"
+        sqlColumnType:
+          $ref: "#/components/schemas/sqlColumnType"
+        labels:
+          $ref: "#/components/schemas/objectLabels"
+        isKey:
+          type: boolean
+          default: false
+          description: Является ли поле ключевым
+        isShardingKey:
+          type: boolean
+          default: false
+          description: Является ли поле ключем шардирования (актуально для распределённых таблиц в БД ClickHouse)
+        semanticType:
+          $ref: "#/components/schemas/semanticType"
+        type:
+          $ref: "#/components/schemas/objectFieldType"
+    objectFieldType:
+      description: Тип ссылочного поля
+      type: object
+      additionalProperties: false
+      properties:
+        refObjectType:
+          description: Тип ссылочного объекта
+          type: string
+          enum:
+            - ANYFIELD
+            - DIMENSION
+            - MEASURE
+        refObject:
+          oneOf:
+            - $ref: "#/components/schemas/anyField"
+            - $ref: "#/components/schemas/objectName32"
+    dataStorage:
+      allOf:
+        - $ref: "#/components/schemas/versionInfo"
+        - $ref: "#/components/schemas/dataStorageEdit"
+        - type: object
+          properties:
+            name:
+              $ref: "#/components/schemas/dataStorageName"
+            aorType:
+              $ref: '#/components/schemas/aorType'
+            models:
+              type: array
+              maxItems: 1000
+              minItems: 0
+              uniqueItems: true
+              description: Массив имён моделей, в которых есть dataStorage, со статусом обработки объекта в ней
+              items:
+                $ref: "#/components/schemas/modelName"
+          additionalProperties: false
+          required:
+            - name
+            - type
+            - fields
+    objectLabels:
+      type: array
+      maxItems: 100
+      uniqueItems: true
+      description: |
+        Тексты, которые описывают различные сущности системы на разных языках для
+          - признаков
+          - атрибутов признаков
+          - показателей
+          - хранилищ данных
+          - композитов
+          - ...
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - language
+          - type
+        description: Зависимый от языка текст различной длины
+        properties:
+          language:
+            type: string
+            maxLength: 5
+            description: Язык текста
+            example: ru-ru
+            pattern: "^[a-z]{2}-[a-z]{2}$"
+          type:
+            $ref: "#/components/schemas/labelType"
+          text:
+            type: string
+            description: Отображаемый текст
+            pattern: '^[^\n\t]+$'
+            minLength: 1
+            maxLength: 255
+    model:
+      allOf:
+        - $ref: "#/components/schemas/versionInfo"
+        - $ref: "#/components/schemas/modelEdit"
+        - type: object
+          additionalProperties: false
+          description: |
+            Модель - совокупность 
+            - признаков
+            - показателей 
+            - хранилищ
+            - композитов
+            - других объектов
+            принадлежащей одной области системы
+          required:
+            - name
+            - databaseName
+          properties:
+            aorType:
+              $ref: '#/components/schemas/aorType'
+            name:
+              $ref: "#/components/schemas/modelName"
+    aggregationType:
+      description: Тип агрегации значений показателя или поля
+      maxLength: 20
+      enum:
+        - SUMMATION
+        - MAXIMUM
+        - MINIMUM
+        - NO AGGREGATION
+      type: string
+    dimensionKeyType:
+      description: Технический тип данных поля для измерения
+      maxLength: 20
+      enum:
+        - ARRAY[INTEGER]
+        - INTEGER
+        - STRING
+        - DATE
+        - TIME
+        - DATETIME
+        - TIMESTAMP
+        - BOOLEAN
+        - ARRAY[STRING]
+        - UUID
+      type: string
+    measureKeyType:
+      description: Технический тип данных поля для показателя
+      enum:
+        - FLOAT
+        - INTEGER
+        - DECIMAL
+      type: string
+      maxLength: 20
+    labelType:
+      description: Вид метки для описания объекта - короткий для вывода в поле ограниченной длины, - длинный для отображения подробного описания
+      type: string
+      maxLength: 20
+      enum:
+        - SHORT
+        - LONG
+    valueText:
+      description: Вид текста для значений измерения
+      type: string
+      maxLength: 20
+      enum:
+        - SHORT
+        - MEDIUM
+        - LONG
+    database:
+      allOf:
+        - $ref: "#/components/schemas/versionInfo"
+        - $ref: "#/components/schemas/databaseEdit"
+        - type: object
+          additionalProperties: false
+          description: Параметры базы данных
+          required:
+            - name
+            - type
+            - connections
+          properties:
+            aorType:
+              $ref: '#/components/schemas/aorType'
+            name:
+              $ref: "#/components/schemas/databaseName"
+    connection:
+      type: object
+      additionalProperties: false
+      description: Параметры подключения к базе данных
+      required:
+        - host
+        - ports
+      properties:
+        type:
+          type: string
+          enum:
+            - LOAD_BALANCER
+            - NODE
+            - DATAGATE
+          description: |
+            Модель - совокупность 
+            - LOAD_BALANCER - Подключение к БД через балансировщик нагрузки
+            - NODE - Прямое подключение к узлу БД 
+            - DATAGATE - Подключение к БД через DATAGATE
+        host:
+          description: Хост
+          type: string
+          maxLength: 255
+          pattern: "^[a-zA-Z0-9-:.]+$"
+        ports:
+          type: array
+          items:
+            $ref: "#/components/schemas/port"
+          maxItems: 100
+          uniqueItems: true
+    port:
+      type: object
+      additionalProperties: false
+      description: Порт подключения к базе данных
+      required:
+        - port
+        - protocol
+        - sqlDialect
+        - secured
+      properties:
+        port:
+          description: Порт подключения
+          type: integer
+          minimum: 1
+          maximum: 65535
+        protocol:
+          description: Протокол подключения
+          type: string
+          maxLength: 30
+          enum:
+            - CLICKHOUSE_HTTP
+            - CLICKHOUSE_NATIVE
+            - POSTGRESQL_V3
+        sqlDialect:
+          type: string
+          description: SQL диалект порта
+          maxLength: 30
+          enum:
+            - CLICKHOUSE
+            - GREENPLUM
+            - POSTGRESQL
+        secured:
+          type: boolean
+          default: false
+          description: Подключение защищено
+    dimensionEdit:
+      additionalProperties: false
+      type: object
+      properties:
+        informationCategory:
+          $ref: "#/components/schemas/informationCategory"
+        labels:
+          $ref: "#/components/schemas/objectLabels"
+        precision:
+          description: Длина поля
+          type: integer
+          minimum: 1
+          maximum: 1333
+        type:
+          $ref: "#/components/schemas/dimensionKeyType"
+        authorizationRelevant:
+          type: boolean
+          default: false
+          description: Релевантность проверке полномочий
+        textsTimeDependency:
+          type: boolean
+          default: false
+          description: Зависимость текстов от времени
+        textsLanguageDependency:
+          type: boolean
+          default: false
+          description: Зависимость текстов от языка
+        dimensionRef:
+          $ref: "#/components/schemas/dimensionName"
+        valueTexts:
+          type: array
+          items:
+            $ref: "#/components/schemas/valueText"
+          maxItems: 10
+          uniqueItems: true
+        valueAttributes:
+          type: array
+          items:
+            $ref: "#/components/schemas/dimensionAttribute"
+          maxItems: 1000
+          uniqueItems: true
+        caseSensitive:
+          type: boolean
+          default: false
+          description: Зависимость значений от регистра
+        dataAccessMethod:
+          type: string
+          description: Метод доступа к данным
+          pattern: "^[A-Z0-9_]+$"
+          minLength: 1
+          maxLength: 255
+        businessKeyRepresentation:
+          type: string
+          description: Отображение бизнес-ключа
+          pattern: "^[A-Z0-9_]+$"
+          minLength: 1
+          maxLength: 255
+        isVirtual:
+          type: boolean
+          default: false
+          description: Виртуальное измерение
+        aiPrompt:
+          $ref: "#/components/schemas/aiPrompt"
+    measureEdit:
+      type: object
+      additionalProperties: false
+      properties:
+        labels:
+          $ref: "#/components/schemas/objectLabels"
+        measureRef:
+          $ref: "#/components/schemas/measureName"
+        type:
+          $ref: "#/components/schemas/measureKeyType"
+        precision:
+          description: При изменении только в сторону увеличения
+          type: integer
+          minimum: 1
+          maximum: 34
+          default: 0
+        scale:
+          description: При изменении только в сторону увеличения, актуально для типа данных Decimal
+          type: integer
+          minimum: 0
+          maximum: 34
+        authorizationRelevant:
+          description: authorization relevance
+          type: boolean
+          default: false
+        aggregationType:
+          $ref: "#/components/schemas/aggregationType"
+        unitOfMeasure:
+          oneOf:
+            - $ref: "#/components/schemas/dimensionName"
+            - $ref: "#/components/schemas/dimensionFilter"
+        filter:
+          type: array
+          description: Список уникальных значений dimension
+          items:
+            $ref: "#/components/schemas/dimensionFilter"
+          maxItems: 100
+          uniqueItems: true
+    databaseEdit:
+      type: object
+      additionalProperties: false
+      description: Параметры базы данных
+      properties:
+        type:
+          description: Тип базы данных
+          type: string
+          maxLength: 50
+          enum:
+            - CLICKHOUSE
+            - GREENPLUM
+            - POSTGRESQL
+        defaultClusterName:
+          type: string
+          description: Имя кластера, в котором будут создаваться таблицы. Актуально только для БД с несколькими шардами
+          pattern: "^[a-zA-Z0-9_-]+$"
+          minLength: 1
+          maxLength: 255
+        connections:
+          type: array
+          items:
+            $ref: "#/components/schemas/connection"
+          maxItems: 3
+          uniqueItems: true
+        labels:
+          $ref: "#/components/schemas/objectLabels"
+        dbName:
+          type: string
+          description: Имя базы данных. Актуально только для БД Postgre и GreenPlum
+          pattern: "^[a-zA-Z0-9_-]+$"
+          minLength: 1
+          maxLength: 255
+    modelEdit:
+      type: object
+      additionalProperties: false
+      description: |
+        Модель - совокупность 
+        - признаков
+        - показателей 
+        - хранилищ
+        - композитов
+        - других объектов
+        принадлежащей одной области системы
+      properties:
+        labels:
+          $ref: "#/components/schemas/objectLabels"
+        databaseName:
+          $ref: "#/components/schemas/databaseName"
+        schemaName:
+          $ref: "#/components/schemas/schemaName"
+        dimensionTechFields:
+          description: Флаг, включающий поля deleted и timestamp в *_values таблицах
+          type: boolean
+          default: false
+        aorSpaceId:
+          $ref: "#/components/schemas/uuid"
+    hierarchyEdit:
+      type: object
+      additionalProperties: false
+      properties:
+        labels:
+          $ref: "#/components/schemas/objectLabels"
+        additionalDimensions:
+          type: array
+          description: Дополнительные (не базовые) измерения иерархии
+          uniqueItems: true
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/dimensionName"
+        defaultHierarchy:
+          type: boolean
+          default: false
+          description: Признак базовой иерархии для справочника.
+        isVersioned:
+          type: boolean
+          default: false
+          description: Версионируемость
+        isTimeDependent:
+          type: boolean
+          default: false
+          description: Зависимость от времени
+        timeDependencyType:
+          type: string
+          enum:
+            - WHOLE
+            - NODE
+          description: |
+            Тип зависимости от времени
+            - WHOLE - зависит вся иерархия
+            - NODE - только узлы
+        defaultExpansion:
+          type: integer
+          minimum: 1
+          maximum: 99
+          description: Начальный уровень развертки
+          default: 3
+        aggregationType:
+          description: |
+            Тип агрегации:
+            - 'NONE' - без агрегации,
+            - 'SUM' - суммирование,
+            - 'AVG' - расчет среднего значения
+          type: string
+          enum:
+            - NONE
+            - SUM
+            - AVG
+          default: SUM
+        inputOnNodes:
+          type: boolean
+          default: false
+          description: Разрешить ввод на узлы.
+    searchQuery:
+      description: Поиск фрагмента технического имени или описания
+      type: string
+      minLength: 1
+      maxLength: 255
+      pattern: '^[^\n\t]+$'
+    searchType:
+      description: Тип объекта фильтрации
+      type: string
+      maxLength: 20
+      enum:
+        - MEASURE
+        - COMPOSITE
+        - DIMENSION
+        - DATA_STORAGE
+    dataStorageType:
+      description: Тип хранилища
+      type: string
+      enum:
+        - CUBELIKE
+        - TABLE
+        - DIMENSION_VALUES
+        - DIMENSION_TEXTS
+        - DIMENSION_ATTRIBUTES
+        - HIERARCHY_VERSIONS
+        - HIERARCHY_TEXTVERSIONS
+        - HIERARCHY_NODES
+        - HIERARCHY_TEXTNODES
+        - CUBELIKE_REPLICATED
+        - TABLE_REPLICATED
+    dataStorageEdit:
+      additionalProperties: false
+      type: object
+      properties:
+        informationCategory:
+          $ref: "#/components/schemas/informationCategory"
+        labels:
+          $ref: "#/components/schemas/objectLabels"
+        type:
+          $ref: "#/components/schemas/dataStorageType"
+        planningEnabled:
+          type: boolean
+          default: false
+          description: Возможность изменения данных в DSO
+        logDataStorageName:
+          $ref: "#/components/schemas/dataStorageName"
+        dbObjects:
+          type: array
+          description: Список объектов БД для data storage
+          items:
+            $ref: "#/components/schemas/dbObject"
+          minItems: 1
+          maxItems: 1000
+        fields:
+          type: array
+          description: Список полей в data storage
+          items:
+            $ref: "#/components/schemas/dataStorageField"
+          minItems: 1
+          maxItems: 1000
+          uniqueItems: true
+    composite:
+      allOf:
+        - $ref: "#/components/schemas/versionInfo"
+        - $ref: "#/components/schemas/compositeEdit"
+        - type: object
+          additionalProperties: false
+          required:
+            - datasources
+            - linkType
+            - name
+            - fields
+          properties:
+            name:
+              $ref: "#/components/schemas/compositeName"
+            schemaName:
+              $ref: "#/components/schemas/schemaName"
+            aorType:
+              $ref: '#/components/schemas/aorType'
+    compositeEdit:
+      type: object
+      additionalProperties: false
+      properties:
+        labels:
+          $ref: "#/components/schemas/objectLabels"
+        datasources:
+          type: array
+          description: Источники данных в композите
+          items:
+            $ref: "#/components/schemas/datasource"
+          maxItems: 1000
+          minItems: 1
+          uniqueItems: true
+        fields:
+          type: array
+          description: Поля из источников данных в композите
+          items:
+            $ref: "#/components/schemas/compositeField"
+          minItems: 1
+          maxItems: 1000
+          uniqueItems: true
+        linkType:
+          type: string
+          description: Тип связи источников данных
+          enum:
+            - LEFT_JOIN
+            - INNER_JOIN
+            - UNION
+            - SELECT
+        linkFields:
+          type: array
+          description: Список полей композита, участвующих в JOIN
+          maxItems: 1000
+          uniqueItems: true
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              left:
+                $ref: "#/components/schemas/linkField"
+              right:
+                $ref: "#/components/schemas/linkField"
+    compositeGet:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - schemaName
+        - fields
+        - datasources
+        - linkType
+      properties:
+        aorType:
+          $ref: '#/components/schemas/aorType'
+        version:
+          $ref: "#/components/schemas/version"
+        updatedAt:
+          $ref: "#/components/schemas/timestamp"
+        updatedBy:
+          $ref: "#/components/schemas/user"
+        name:
+          $ref: "#/components/schemas/compositeName"
+        schemaName:
+          $ref: "#/components/schemas/schemaName"
+          deprecated: true
+        labels:
+          $ref: "#/components/schemas/objectLabels"
+        fields:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/compositeField"
+        dbObjects:
+          type: array
+          description: Список объектов БД для data storage
+          items:
+            $ref: "#/components/schemas/dbObject"
+          minItems: 0
+          maxItems: 1000
+        models:
+          type: array
+          description: Модели, использующие композит, со статусом обработки объекта в нем
+          items:
+            $ref: "#/components/schemas/modelName"
+          maxItems: 1000
+          minItems: 0
+          uniqueItems: true
+        datasources:
+          type: array
+          description: Источники данных в композите
+          items:
+            $ref: "#/components/schemas/datasource"
+          maxItems: 1000
+          minItems: 1
+          uniqueItems: true
+        linkType:
+          type: string
+          description: Тип связи источников данных
+          enum:
+            - LEFT_JOIN
+            - INNER_JOIN
+            - UNION
+            - SELECT
+        linkFields:
+          type: array
+          description: Список полей композита, участвующих в JOIN
+          maxItems: 1000
+          uniqueItems: true
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              left:
+                $ref: "#/components/schemas/linkField"
+              right:
+                $ref: "#/components/schemas/linkField"
+    compositeField:
+      type: object
+      additionalProperties: false
+      required:
+        - datasourceLinks
+        - name
+        - sqlName
+        - type
+        - semanticType
+      properties:
+        datasourceLinks:
+          type: array
+          minItems: 0
+          maxItems: 100
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/linkField"
+        name:
+          $ref: "#/components/schemas/objectName32"
+        sqlName:
+          $ref: "#/components/schemas/sqlName"
+        sqlColumnType:
+          $ref: "#/components/schemas/sqlColumnType"
+        labels:
+          $ref: "#/components/schemas/objectLabels"
+        semanticType:
+          $ref: "#/components/schemas/semanticType"
+        type:
+          $ref: "#/components/schemas/objectFieldType"
+    sqlColumnType:
+      type: string
+      description: Тип данных поля в БД
+      pattern: '^[^\n\t]+$'
+      minLength: 1
+      maxLength: 32
+    datasource:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          $ref: "#/components/schemas/objectName255"
+        schemaName:
+          $ref: "#/components/schemas/schemaName"
+        type:
+          type: string
+          description: Тип источника данных
+          enum:
+            - DATASTORAGE
+            - COMPOSITE
+            - VIEW
+            - CE_SCENARIO
+    linkField:
+      type: object
+      required:
+        - datasource
+        - datasourceField
+      additionalProperties: false
+      properties:
+        datasource:
+          $ref: "#/components/schemas/objectName255"
+        datasourceField:
+          $ref: "#/components/schemas/objectName255"
+    sqlName:
+      type: string
+      description: Техническое имя колонки в таблице БД
+      pattern: "^[a-zA-Z0-9_/]+$"
+      minLength: 1
+      maxLength: 255
+    semanticType:
+      type: string
+      description: |
+        Семантический тип поля 
+          - описательное (признак)
+          - значения (показатель)
+      enum:
+        - DIMENSION
+        - MEASURE
+    pvDictionary:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          description: Имя справочника в PV Dictionaries
+          pattern: "^[a-zA-Z0-9]+$"
+          minLength: 1
+          maxLength: 255
+        domainName:
+          type: string
+          description: Имя домена, содержащего справочник в PV Dictionaries
+          pattern: "^[a-zA-Z0-9_]+$"
+          minLength: 1
+          maxLength: 255
+        domainLabel:
+          type: string
+          description: Описание домена, содержащего справочник в PV Dictionaries
+          pattern: '^[^\n\t]+$'
+          minLength: 1
+          maxLength: 255
+        status:
+          $ref: "#/components/schemas/result"
+        msg:
+          $ref: "#/components/schemas/msg"
+    sortDirection:
+      description: Направление сортировки
+      default: asc
+      enum:
+        - asc
+        - desc
+      type: string
+    paginationPageCount:
+      example: 1
+      description: Страница (параметр пагинации)
+      type: integer
+      minimum: 1
+      maximum: 100
+    paginationRowCount:
+      example: 1
+      description: Страница (параметр пагинации)
+      type: integer
+      minimum: 1
+      maximum: 100
+    dbObject:
+      allOf:
+        - $ref: "#/components/schemas/dbObjectForSearch"
+        - type: object
+          required:
+            - schemaName
+            - name
+            - objectType
+          additionalProperties: false
+          properties:
+            objectType:
+              type: string
+              description: Тип объекта БД
+              enum:
+                - VIEW
+                - TABLE
+                - DISTRIBUTED_TABLE
+                - DICTIONARY
+                - REPLICATED_TABLE
+            objectSpecificAttributes:
+              type: array
+              description: Специфичные атрибуты объекта
+              items:
+                $ref: "#/components/schemas/specificAttribute"
+              maxItems: 1000
+              uniqueItems: true
+    dbObjectForSearch:
+      required:
+        - schemaName
+        - name
+      additionalProperties: false
+      type: object
+      properties:
+        schemaName:
+          $ref: "#/components/schemas/schemaName"
+        name:
+          $ref: "#/components/schemas/objectName255"
+    synchronizationResult:
+      type: object
+      additionalProperties: false
+      properties:
+        tenant:
+          $ref: "#/components/schemas/tenantName"
+        modelName:
+          $ref: "#/components/schemas/modelName"
+        objectName:
+          $ref: "#/components/schemas/dataStorageName"
+        comment:
+          type: string
+          description: Комментарий к синхронизации
+          maxLength: 255
+          minLength: 0
+          pattern: '^[^\n\t]+$'
+        status:
+          type: string
+          description: Статус синхронизации
+          enum:
+            - SUCCESS
+            - IGNORED
+            - FAILURE
+    searchResponse:
+      type: object
+      description: Результат поиска элементов по категориям
+      additionalProperties: false
+      properties:
+        modelName:
+          $ref: "#/components/schemas/SeacrhGroupItems"
+    objectLinks:
+      type: object
+      description: Результат поиска связей объекта
+      additionalProperties: false
+      properties:
+        modelName:
+          $ref: "#/components/schemas/SeacrhGroupItems"
+    SeacrhGroupItems:
+      additionalProperties: false
+      description: Модель, содержащая результаты поиска
+      type: object
+      properties:
+        dimensions:
+          type: array
+          description: Список измерений
+          minItems: 0
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/dimensionName"
+        measures:
+          type: array
+          description: Список показателей
+          minItems: 0
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/measureName"
+        dataStorages:
+          type: array
+          description: Список хранилищ данных
+          minItems: 0
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/dataStorageName"
+        composites:
+          type: array
+          description: Список композитов
+          minItems: 0
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/compositeName"
+    permission:
+      type: string
+      description: Права на объект
+      maxLength: 255
+      minLength: 1
+      pattern: "^[a-zA-Z0-9_.]+$"
+    checkPossibleToDropMode:
+      type: boolean
+      default: true
+      description: Возможность удаления таблицы
+    copyAttributes:
+      type: boolean
+      default: true
+      description: Копирование с вложенными атрибутами
+    aiPrompt:
+      required:
+        - analyticRole
+        - purpose
+        - keyFeatures
+        - dataType
+        - subjectArea
+        - exampleQuestions
+        - markers
+        - notes
+        - aiUsage
+        - vectorSearch
+        - fallbackToLlmValues
+        - preferableColumn
+        - analyticDescriptions
+      additionalProperties: false
+      type: object
+      properties:
+        analyticRole:
+          type: array
+          description: Роль в аналитике
+          minItems: 0
+          maxItems: 100
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 8192
+            pattern: '^[^\n\t]+$'
+        relatedDimensions:
+          type: array
+          uniqueItems: true
+          description: Список зависимых сущностей. Определяется как те измерения, атрибутами которого являются выбранные
+          minItems: 0
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/dimensionName"
+        purpose:
+          type: array
+          description: Назначение
+          minItems: 0
+          maxItems: 100
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 8192
+            pattern: '^[^\n\t]+$'
+        keyFeatures:
+          type: array
+          description: Ключевые особенности
+          minItems: 0
+          maxItems: 100
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 8192
+            pattern: '^[^\n\t]+$'
+        dataType:
+          type: array
+          description: Тип данных
+          minItems: 0
+          maxItems: 100
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: '^[^\n\t]+$'
+        subjectArea:
+          type: array
+          description: Предметная область
+          minItems: 0
+          maxItems: 100
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: '^[^\n\t]+$'
+        exampleQuestions:
+          type: array
+          description: Вопросы для извлечения. Примеры вопросов для аналитики (анализ затрат, распределение расходов)
+          minItems: 0
+          maxItems: 100
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: '^[^\n\t]+$'
+        markers:
+          type: array
+          description: Маркерные признаки
+          minItems: 0
+          maxItems: 100
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 1024
+            pattern: '^[^\n\t]+$'
+        notes:
+          type: array
+          description: Дополнительные примечания (описание сокращений, типов МВЗ)
+          minItems: 0
+          maxItems: 100
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 1024
+            pattern: '^[^\n\t]+$'
+        aiUsage:
+          type: boolean
+          default: false
+          description: Флаг использования измерения / группы в AI
+          example: true
+        domainId:
+          type: integer
+          description: Отчет / область (для расширения функционала ассистента в Q4, выбор среди нескольких отчетов)
+          minimum: 1
+          maximum: 2147483647
+          example: 1
+        groupId:
+          $ref: "#/components/schemas/groupId"
+        vectorSearch:
+          type: boolean
+          default: false
+          description: Флаг присутствия в ВБД (можем искать значение аналитики и использовать в фильтре)
+          example: false
+        fallbackToLlmValues:
+          type: boolean
+          default: false
+          description: Флаг отката к значениям LLM
+          example: false
+        preferableColumn:
+          type: boolean
+          default: false
+          description: Размещаем в столбце или в строке (default=false аналитика в столбец)
+          example: false
+        groupDescriptions:
+          $ref: "#/components/schemas/aiGroupEdit"
+        analyticDescriptions:
+          type: object
+          description: Группа описаний для измерения
+          additionalProperties: false
+          properties:
+            entityName:
+              $ref: "#/components/schemas/entityName"
+            description:
+              $ref: "#/components/schemas/description"
+            synonyms:
+              $ref: "#/components/schemas/synonyms"
+            fewShots:
+              $ref: "#/components/schemas/fewShots"
+    entityName:
+      $ref: "#/components/schemas/objectName255"
+    description:
+      type: string
+      minLength: 1
+      maxLength: 8192
+      pattern: '^[^\n\t]+$'
+      example: Иерархическая или функциональная система управления, включающая отделы, департаменты, подразделения и руководящие должности, которая определяет распределение обязанностей, полномочий и взаимодействие внутри компании
+    synonyms:
+      type: string
+      description: Cинонимичные или связанные фразы/выражения
+      minLength: 1
+      maxLength: 8192
+      pattern: '^[^\n\t]+$'
+      example: БФ
+    fewShots:
+      type: string
+      description: Примеры фраз и идентификаций
+      minLength: 1
+      maxLength: 8192
+      pattern: '^[^\n\t]+$'
+      example: Покажи расходы по блокам -> по блокам
+    informationCategory:
+      type: string
+      description: Категория информации
+      enum:
+        - K1
+        - K2
+        - K3
+        - K4
+    groupId:
+      type: integer
+      description: Идентификатор группы, к которой принадлежит измерение
+      minimum: 1
+      maximum: 2147483647
+      example: 1
+    aiGroup:
+      allOf:
+        - type: object
+          required:
+            - groupId
+          additionalProperties: false
+          properties:
+            groupId:
+              $ref: "#/components/schemas/groupId"
+        - $ref: "#/components/schemas/aiGroupEdit"
+    aiGroupEdit:
+      type: object
+      description: Параметры AI группы
+      additionalProperties: false
+      properties:
+        entityName:
+          $ref: "#/components/schemas/entityName"
+        description:
+          $ref: "#/components/schemas/description"
+        synonyms:
+          $ref: "#/components/schemas/synonyms"
+        fewShots:
+          $ref: "#/components/schemas/fewShots"
+    aiGroupNew:
+      type: object
+      description: Параметры новой AI группы
+      additionalProperties: false
+      required:
+        - entityName
+      properties:
+        entityName:
+          $ref: "#/components/schemas/entityName"
+        description:
+          $ref: "#/components/schemas/description"
+        synonyms:
+          $ref: "#/components/schemas/synonyms"
+        fewShots:
+          $ref: "#/components/schemas/fewShots"
+    hierarchyNew:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+      properties:
+        name:
+          $ref: "#/components/schemas/hierarchyName"
+        structureType:
+          description: |
+            Тип структуры иерархии
+            - MIXED - расширенная
+            - PARENT_CHILD - родитель-потомок
+            - FLAT - плоская, линейная
+          type: string
+          enum:
+            - MIXED
+            - PARENT_CHILD
+            - FLAT
+        labels:
+          $ref: "#/components/schemas/objectLabels"
+        additionalDimensions:
+          type: array
+          description: Дополнительные (не базовые) измерения иерархии
+          uniqueItems: true
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/dimensionName"
+        defaultHierarchy:
+          type: boolean
+          default: false
+          description: Признак базовой иерархии для справочника.
+        isVersioned:
+          type: boolean
+          default: false
+          description: Версионируемость
+        isTimeDependent:
+          type: boolean
+          default: false
+          description: Зависимость от времени
+        timeDependencyType:
+          type: string
+          enum:
+            - WHOLE
+            - NODE
+          description: |
+            Тип зависимости от времени
+            - WHOLE - зависит вся иерархия
+            - NODE - только узлы
+        defaultExpansion:
+          type: integer
+          minimum: 1
+          maximum: 99
+          description: Начальный уровень развертки
+          default: 3
+        aggregationType:
+          description: |
+            Тип агрегации:
+            - 'NONE' - без агрегации,
+            - 'SUM' - суммирование,
+            - 'AVG' - расчет среднего значения
+          type: string
+          enum:
+            - NONE
+            - SUM
+            - AVG
+          default: SUM
+        inputOnNodes:
+          type: boolean
+          default: false
+          description: Разрешить ввод на узлы.
+    modelStatus:
+      type: object
+      description: Модель со статусом обработки объекта в ней
+      additionalProperties: false
+      required:
+        - name
+      properties:
+        name:
+          $ref: "#/components/schemas/modelName"
+        status:
+          $ref: "#/components/schemas/result"
+        msg:
+          $ref: "#/components/schemas/msg"
+    result:
+      description: Результат
+      type: string
+      enum:
+        - SUCCESS
+        - PENDING
+        - FAILURE
+    msg:
+      type: string
+      maxLength: 8192
+      minLength: 1
+      description: Сообщение
+      example: Комментарий
+    objectStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        modelName:
+          $ref: "#/components/schemas/objectName32"
+        schemaName:
+          $ref: "#/components/schemas/schemaName"
+        objectName:
+          $ref: "#/components/schemas/objectName64"
+        objectType:
+          $ref: "#/components/schemas/objectType"
+        status:
+          $ref: "#/components/schemas/result"
+        msg:
+          $ref: "#/components/schemas/msg"
+    respObjectStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        modelName:
+          $ref: "#/components/schemas/objectName32"
+        schemaName:
+          $ref: "#/components/schemas/schemaName"
+        objectName:
+          $ref: "#/components/schemas/objectName64"
+        objectType:
+          $ref: "#/components/schemas/objectType"
+        status:
+          $ref: "#/components/schemas/result"
+        updated:
+          type: boolean
+          description: Маркер обновления данных (статуса) в БД
+        msg:
+          $ref: "#/components/schemas/msg"
+    objectType:
+      type: string
+      description: Тип объекта БД
+      enum:
+        - DIMENSION
+        - MEASURE
+        - DATA_STORAGE
+        - COMPOSITE
+        - DATABASE_OBJECT
+        - HIERARCHY
+        - PV_DICTIONARY
+    dimensionValues:
+      type: object
+    pagination:
+      description: Объект пагинации
+      type: object
+      additionalProperties: false
+      properties:
+        page:
+          $ref: "#/components/schemas/paginationPageCount"
+        pageSize:
+          $ref: "#/components/schemas/paginationRowCount"
+        total:
+          description: Общее количество страниц
+          type: integer
+          minimum: 1
+          maximum: 1333
+        totalRows:
+          description: Общее количество строк
+          type: integer
+          minimum: 1
+          maximum: 1333
+      required:
+        - page
+        - pageSize
+        - total
+        - totalRows
+    valuesDimensionResponse:
+      type: object
+      additionalProperties: false
+      description: Вывод значений справочника
+      properties:
+        bk:
+          type: string
+          example: "10039140"
+          maxLength: 255
+          pattern: '^[^\n\t]+$'
+          description: Значение бизнес-ключа
+        texts:
+          type: array
+          maxItems: 10000
+          description: Текстовые значения
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              dateTo:
+                type: string
+                description: Дата окончания текста
+                example: "2026-01-12"
+                maxLength: 255
+                pattern: '^[^\n\t]+$'
+              dateFrom:
+                type: string
+                description: Дата начала текста
+                example: "2025-01-12"
+                maxLength: 255
+                pattern: '^[^\n\t]+$'
+              language:
+                type: string
+                description: Язык текста
+                example: "R"
+                maxLength: 5
+                pattern: '^[^\n\t]+$'
+              txtLong:
+                type: string
+                description: Длинный текст
+                example: "HR Сопровождение"
+                maxLength: 1333
+                pattern: '^[^\n\t]+$'
+              txtMedium:
+                type: string
+                description: Средний текст
+                example: "HR Сопровождение"
+                maxLength: 40
+                pattern: '^[^\n\t]+$'
+              txtShort:
+                type: string
+                description: Короткий текст
+                example: "163.12D"
+                maxLength: 20
+                pattern: '^[^\n\t]+$'
+    aorType:
+      description: Тип объекта в AOR
+      type: string
+      enum:
+        - sl_model
+        - sl_hierarchy
+        - sl_dimension
+        - sl_measure
+        - sl_datastorage
+        - sl_databaseobject
+        - sl_composite
+        - sl_database
+        - sl_aigroup
+      example: sl_dimension
+    uuid:
+      description: идентификатор
+      type: string
+      format: uuid
+    valuesFiltersRequest:
+      type: object
+      description: Фильтры
+      additionalProperties: false
+      properties:
+        includeBlocks:
+          type: array
+          maxItems: 3
+          description: Выбор блока справочника - Бизнес-ключи / Тексты справочника / Атрибуты
+          items:
+            type: string
+            enum:
+              - "BKS"
+              - "TEXTS"
+              - "ATTRIBUTES"
+          example:
+            - "BKS"
+            - "ATTRIBUTES"
+        controlDateOrPeriod:
+          oneOf:
+            - type: string
+              maxLength: 255
+              pattern: '^[^\n\t]+$'
+              description: Контрольная дата
+              example: "2025-04-05"
+            - type: object
+              properties:
+                from:
+                  type: string
+                  maxLength: 255
+                  pattern: '^[^\n\t]+$'
+                  description: Дата начала периода
+                  example: "2025-04-01"
+                  default: "1900-01-01"
+                to:
+                  type: string
+                  maxLength: 255
+                  pattern: '^[^\n\t]+$'
+                  description: Дата окончания периода
+                  example: "2025-12-31"
+                  default: "2299-12-31"
+    version:
+      description: Версия объекта
+      type: integer
+      minimum: 1
+      maximum: 2147483647
+      example: 6
+    versionAor:
+      description: Версия объекта в AOR
+      type: string
+      maxLength: 2147483647
+      pattern: ^[0-9a-zA-Z\.\-_]+$
+      example: "6"
+    timestamp:
+      type: string
+      description: Дата и время
+      example: "2025-05-06 18:16:15.690"
+    user:
+      type: string
+      description: Пользователь
+      pattern: ^[^\n\t]+$
+      example: EPMSuperUser
+    deleted:
+      description: Маркер удаления
+      type: boolean
+      example: false
+    versionInfo:
+      description: Все версии объекта без имени
+      type: object
+      properties:
+        version:
+          $ref: "#/components/schemas/version"
+        updatedAt:
+          $ref: "#/components/schemas/timestamp"
+        updatedBy:
+          $ref: "#/components/schemas/user"

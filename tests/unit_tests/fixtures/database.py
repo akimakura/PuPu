@@ -1,0 +1,413 @@
+from datetime import datetime
+
+import pytest
+
+from src.db.database import Connection, Database, DatabaseLabel, Port
+from src.models.database import (
+    Connection as ConnectionModel,
+    ConnetionTypeEnum,
+    Database as DatabaseModel,
+    DatabaseCreateRequest as DatabaseCreateRequestmModel,
+    DatabaseEditRequest as DatabaseEditRequestModel,
+    DatabaseTypeEnum,
+    Port as PortModel,
+    ProtocolTypeEnum,
+)
+from src.models.label import Label, LabelType
+
+
+@pytest.fixture
+def databases() -> list[Database]:
+    return [
+        Database(
+            version=1,
+            timestamp=datetime(2023, 1, 1, 1, 1, 1, 1),
+            name="test_database1",
+            db_name="ch1",
+            tenant_id="tenant1",
+            type=DatabaseTypeEnum.CLICKHOUSE,
+            labels=[
+                DatabaseLabel(
+                    language="ru-ru",
+                    type=LabelType.SHORT,
+                    text="test",
+                ),
+                DatabaseLabel(
+                    language="ru-ru",
+                    type=LabelType.LONG,
+                    text="test",
+                ),
+            ],
+            connections=[
+                Connection(
+                    host="127.0.0.1",
+                    type=ConnetionTypeEnum.LOAD_BALANCER,
+                    ports=[
+                        Port(
+                            port=1000,
+                            protocol=ProtocolTypeEnum.CLICKHOUSE_HTTP,
+                            sql_dialect=DatabaseTypeEnum.CLICKHOUSE,
+                            secured=False,
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        Database(
+            version=1,
+            timestamp=datetime(2023, 1, 1, 1, 1, 1, 1),
+            name="test_database2",
+            tenant_id="tenant1",
+            type=DatabaseTypeEnum.GREENPLUM,
+            db_name="gp2",
+            labels=[
+                DatabaseLabel(
+                    language="ru-ru",
+                    type=LabelType.SHORT,
+                    text="test",
+                ),
+                DatabaseLabel(
+                    language="ru-ru",
+                    type=LabelType.LONG,
+                    text="test",
+                ),
+            ],
+            connections=[
+                Connection(
+                    host="127.0.0.2",
+                    type=ConnetionTypeEnum.LOAD_BALANCER,
+                    ports=[
+                        Port(
+                            port=1111,
+                            protocol=ProtocolTypeEnum.POSTGRESQL_V3,
+                            sql_dialect=DatabaseTypeEnum.GREENPLUM,
+                            secured=False,
+                        ),
+                        Port(
+                            port=1111,
+                            protocol=ProtocolTypeEnum.POSTGRESQL_V3,
+                            sql_dialect=DatabaseTypeEnum.GREENPLUM,
+                            secured=False,
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        Database(
+            version=1,
+            timestamp=datetime(2023, 1, 1, 1, 1, 1, 1),
+            name="test_database3",
+            tenant_id="tenant1",
+            db_name="gp3",
+            labels=[
+                DatabaseLabel(
+                    language="ru-ru",
+                    type=LabelType.SHORT,
+                    text="test",
+                ),
+                DatabaseLabel(
+                    language="ru-ru",
+                    type=LabelType.LONG,
+                    text="test",
+                ),
+            ],
+            type=DatabaseTypeEnum.GREENPLUM,
+            connections=[
+                Connection(
+                    host="127.0.0.2",
+                    type=ConnetionTypeEnum.LOAD_BALANCER,
+                    ports=[
+                        Port(
+                            port=1111,
+                            protocol=ProtocolTypeEnum.POSTGRESQL_V3,
+                            sql_dialect=DatabaseTypeEnum.GREENPLUM,
+                            secured=False,
+                        ),
+                        Port(
+                            port=1111,
+                            protocol=ProtocolTypeEnum.POSTGRESQL_V3,
+                            sql_dialect=DatabaseTypeEnum.GREENPLUM,
+                            secured=False,
+                        ),
+                    ],
+                ),
+            ],
+        ),
+    ]
+
+
+database_model_list = [
+    DatabaseModel(
+        version=1,
+        timestamp=datetime(2023, 1, 1, 1, 1, 1, 1),
+        name="test_database1",
+        db_name="ch1",
+        tenant_id="tenant1",
+        labels=[
+            Label(
+                language="ru-ru",
+                type=LabelType.SHORT,
+                text="test",
+            ),
+            Label(
+                language="ru-ru",
+                type=LabelType.LONG,
+                text="test",
+            ),
+        ],
+        type=DatabaseTypeEnum.CLICKHOUSE,
+        connections=[
+            ConnectionModel(
+                host="127.0.0.1",
+                type=ConnetionTypeEnum.LOAD_BALANCER,
+                ports=[
+                    PortModel(
+                        port=1000,
+                        protocol=ProtocolTypeEnum.CLICKHOUSE_HTTP,
+                        sql_dialect=DatabaseTypeEnum.CLICKHOUSE,
+                        secured=False,
+                    ),
+                ],
+            ),
+        ],
+    ),
+    DatabaseModel(
+        version=1,
+        timestamp=datetime(2023, 1, 1, 1, 1, 1, 1),
+        name="test_database2",
+        type=DatabaseTypeEnum.GREENPLUM,
+        tenant_id="tenant1",
+        db_name="gp2",
+        labels=[
+            Label(
+                language="ru-ru",
+                type=LabelType.SHORT,
+                text="test",
+            ),
+            Label(
+                language="ru-ru",
+                type=LabelType.LONG,
+                text="test",
+            ),
+        ],
+        connections=[
+            ConnectionModel(
+                host="127.0.0.2",
+                type=ConnetionTypeEnum.LOAD_BALANCER,
+                ports=[
+                    PortModel(
+                        port=1111,
+                        protocol=ProtocolTypeEnum.POSTGRESQL_V3,
+                        sql_dialect=DatabaseTypeEnum.GREENPLUM,
+                        secured=False,
+                    ),
+                    PortModel(
+                        port=1111,
+                        protocol=ProtocolTypeEnum.POSTGRESQL_V3,
+                        sql_dialect=DatabaseTypeEnum.GREENPLUM,
+                        secured=False,
+                    ),
+                ],
+            ),
+        ],
+    ),
+    DatabaseModel(
+        version=1,
+        timestamp=datetime(2023, 1, 1, 1, 1, 1, 1),
+        name="test_database3",
+        type=DatabaseTypeEnum.GREENPLUM,
+        tenant_id="tenant1",
+        db_name="gp3",
+        labels=[
+            Label(
+                language="ru-ru",
+                type=LabelType.SHORT,
+                text="test",
+            ),
+            Label(
+                language="ru-ru",
+                type=LabelType.LONG,
+                text="test",
+            ),
+        ],
+        connections=[
+            ConnectionModel(
+                host="127.0.0.2",
+                type=ConnetionTypeEnum.LOAD_BALANCER,
+                ports=[
+                    PortModel(
+                        port=1111,
+                        protocol=ProtocolTypeEnum.POSTGRESQL_V3,
+                        sql_dialect=DatabaseTypeEnum.GREENPLUM,
+                        secured=False,
+                    ),
+                    PortModel(
+                        port=1111,
+                        protocol=ProtocolTypeEnum.POSTGRESQL_V3,
+                        sql_dialect=DatabaseTypeEnum.GREENPLUM,
+                        secured=False,
+                    ),
+                ],
+            ),
+        ],
+    ),
+]
+
+
+database_model_create_list = [
+    DatabaseCreateRequestmModel(
+        name="test_database1",
+        db_name="ch1",
+        labels=[
+            Label(
+                language="ru-ru",
+                type=LabelType.SHORT,
+                text="test",
+            ),
+            Label(
+                language="ru-ru",
+                type=LabelType.LONG,
+                text="test",
+            ),
+        ],
+        type=DatabaseTypeEnum.CLICKHOUSE,
+        connections=[
+            ConnectionModel(
+                host="127.0.0.1",
+                type=ConnetionTypeEnum.LOAD_BALANCER,
+                ports=[
+                    PortModel(
+                        port=1000,
+                        protocol=ProtocolTypeEnum.CLICKHOUSE_HTTP,
+                        sql_dialect=DatabaseTypeEnum.CLICKHOUSE,
+                        secured=False,
+                    ),
+                ],
+            ),
+        ],
+    ),
+    DatabaseCreateRequestmModel(
+        name="test_database2",
+        type=DatabaseTypeEnum.GREENPLUM,
+        db_name="gp2",
+        labels=[
+            Label(
+                language="ru-ru",
+                type=LabelType.SHORT,
+                text="test",
+            ),
+            Label(
+                language="ru-ru",
+                type=LabelType.LONG,
+                text="test",
+            ),
+        ],
+        connections=[
+            ConnectionModel(
+                host="127.0.0.2",
+                type=ConnetionTypeEnum.LOAD_BALANCER,
+                ports=[
+                    PortModel(
+                        port=1111,
+                        protocol=ProtocolTypeEnum.POSTGRESQL_V3,
+                        sql_dialect=DatabaseTypeEnum.GREENPLUM,
+                        secured=False,
+                    ),
+                    PortModel(
+                        port=1111,
+                        protocol=ProtocolTypeEnum.POSTGRESQL_V3,
+                        sql_dialect=DatabaseTypeEnum.GREENPLUM,
+                        secured=False,
+                    ),
+                ],
+            ),
+        ],
+    ),
+]
+
+
+database_model_update_list = [
+    DatabaseEditRequestModel(
+        type=DatabaseTypeEnum.GREENPLUM,
+        labels=[
+            Label(
+                language="ru-ru",
+                type=LabelType.SHORT,
+                text="test",
+            ),
+            Label(
+                language="ru-ru",
+                type=LabelType.LONG,
+                text="test",
+            ),
+        ],
+        connections=[
+            ConnectionModel(
+                host="127.0.0.3",
+                type=ConnetionTypeEnum.LOAD_BALANCER,
+                ports=[
+                    PortModel(
+                        port=1022,
+                        protocol=ProtocolTypeEnum.CLICKHOUSE_NATIVE,
+                        sql_dialect=DatabaseTypeEnum.CLICKHOUSE,
+                        secured=False,
+                    ),
+                    PortModel(
+                        port=1111,
+                        protocol=ProtocolTypeEnum.CLICKHOUSE_HTTP,
+                        sql_dialect=DatabaseTypeEnum.CLICKHOUSE,
+                        secured=False,
+                    ),
+                ],
+            ),
+        ],
+    ),
+    DatabaseEditRequestModel(
+        type=DatabaseTypeEnum.CLICKHOUSE,
+        labels=[
+            Label(
+                language="ru-ru",
+                type=LabelType.SHORT,
+                text="test",
+            ),
+            Label(
+                language="ru-ru",
+                type=LabelType.LONG,
+                text="test",
+            ),
+        ],
+        connections=[
+            ConnectionModel(
+                host="127.0.0.1",
+                type=ConnetionTypeEnum.LOAD_BALANCER,
+                ports=[],
+            ),
+        ],
+    ),
+]
+
+
+databases_for_generator = [
+    DatabaseModel(
+        version=1,
+        timestamp=datetime(2023, 1, 1, 1, 1, 1, 1),
+        name="test_database1",
+        tenant_id="tenant1",
+        default_cluster_name="test_cluster",
+        type=DatabaseTypeEnum.CLICKHOUSE,
+        connections=[
+            ConnectionModel(
+                host="127.0.0.1",
+                type=ConnetionTypeEnum.LOAD_BALANCER,
+                ports=[
+                    PortModel(
+                        port=1000,
+                        protocol=ProtocolTypeEnum.CLICKHOUSE_HTTP,
+                        sql_dialect=DatabaseTypeEnum.CLICKHOUSE,
+                        secured=False,
+                    ),
+                ],
+            ),
+        ],
+    ),
+]

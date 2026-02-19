@@ -1,0 +1,1356 @@
+{
+    "any_field": {
+        "type": {
+            "description": "Технический тип данных.",
+            "max_length": 20
+        },
+        "scale": {
+            "description": "Количество знаков после запятой.",
+            "ge": 0,
+            "le": 34
+        },
+        "aggregation_type": {
+            "description": "Тип агрегации значений показателя или поля.",
+            "serialization_alias": "aggregationType",
+            "max_length": 20,
+            "validation_alias": [
+                "aggregationType",
+                "aggregation_type"
+            ]
+        }
+    },
+    "composite": {
+        "name": {
+            "description": "Уникальное техническое имя объекта (имя поля в таблицах/имя таблицы)",
+            "min_length": 1,
+            "max_length": 32,
+            "pattern": "^[a-z0-9_]+$"
+        },
+        "schema_name": {
+            "description": "Уникальное техническое имя объекта (имя поля в таблицах/имя таблицы)",
+            "min_length": 1,
+            "max_length": 255,
+            "pattern": "^[a-zA-Z0-9_]+$",
+            "serialization_alias": "schemaName",
+            "validation_alias": [
+                "schemaName",
+                "schema_name"
+            ]
+        },
+        "labels": {
+            "description": "Тексты, которые описывают различные сущности системы на разных языках.",
+            "max_length": 100
+        },
+        "sql_expression": {
+            "description": "SQL выражение, определяющее формирование данных в композите",
+            "max_length": 1000000,
+            "pattern": "[a-zA-Z0-9-_]+",
+            "serialization_alias": "sqlExpression",
+            "validation_alias": [
+                "sqlExpression",
+                "sql_expression"
+            ]
+        },
+        "fields": {
+            "description": "Поля композита",
+            "max_length": 1000,
+            "min_length": 1
+        },
+        "datasources": {
+            "description": "Источники данных в композите",
+            "max_length": 1000,
+            "min_length": 1
+        },
+        "link_type": {
+            "description": "Тип связи источников данных",
+            "validation_alias": [
+                "linkType",
+                "link_type"
+            ],
+            "serialization_alias": "linkType"
+        },
+        "link_fields": {
+            "description": "Список полей композита, участвующих в JOIN",
+            "max_length": 1000,
+            "validation_alias": [
+                "linkFields",
+                "link_fields"
+            ],
+            "serialization_alias": "linkFields"
+        }
+    },
+    "data_storage": {
+        "name": {
+            "description": "Уникальное техническое имя объекта (имя поля в таблицах/имя таблицы)",
+            "min_length": 1,
+            "max_length": 64,
+            "pattern": "^[a-z0-9_]+$"
+        },
+        "labels": {
+            "description": "Тексты, которые описывают различные сущности системы на разных языках.",
+            "max_length": 100
+        },
+        "table": {
+            "description": "Связанная таблица"
+        },
+        "fields": {
+            "description": "Поля DSO",
+            "max_length": 1000,
+            "min_length": 1
+        },
+        "planning_enabled": {
+            "description": "Возможность изменения данных в DSO.",
+            "serialization_alias": "planningEnabled",
+            "validation_alias": [
+                "planningEnabled",
+                "planning_enabled"
+            ]
+        },
+        "log_data_storage_name": {
+            "serialization_alias": "logDataStorageName",
+            "validation_alias": [
+                "logDataStorageName",
+                "log_data_storage_name"
+            ]
+        },
+        "type": {
+            "description": "Тип хранилища",
+            "max_length": 20
+        },
+        "db_objects": {
+            "description": "Список объектов БД для data storage",
+            "max_length": 10,
+            "min_length": 1,
+            "serialization_alias": "dbObjects",
+            "validation_alias": [
+                "dbObjects",
+                "database_objects",
+                "db_objects"
+            ]
+        },
+        "models_names": {
+            "description": "",
+            "min_length": 0,
+            "max_length": 1000,
+            "serialization_alias": "models",
+            "validation_alias": [
+                "models_names",
+                "models"
+            ]
+        }
+    },
+    "port": {
+        "port": {
+            "description": "Порт подключения",
+            "le": 65535,
+            "ge": 1
+        },
+        "protocol": {
+            "description": "Протокол подключения",
+            "max_length": 30
+        },
+        "sql_dialect": {
+            "description": "Диалект",
+            "serialization_alias": "sqlDialect",
+            "validation_alias": [
+                "sqlDialect",
+                "sql_dialect"
+            ],
+            "max_length": 30
+        },
+        "secured": {
+            "description": "Подключение защищено"
+        }
+    },
+    "connection": {
+        "host": {
+            "description": "Хост",
+            "max_length": 255,
+            "pattern": "^[a-zA-Z0-9-:.]+$"
+        },
+        "ports": {
+            "description": "Порты подключения к базе данных",
+            "max_length": 100
+        },
+        "type": {
+            "description": "Тип подключения"
+        }
+    },
+    "database": {
+        "name": {
+            "description": "Уникальное техническое имя объекта (имя поля в таблицах/имя таблицы).",
+            "min_length": 1,
+            "max_length": 32,
+            "pattern": "^[a-z0-9_]+$"
+        },
+        "type": {
+            "description": "Тип базы данных.",
+            "max_length": 50
+        },
+        "connections": {
+            "description": "Параметры подключения к базе данных",
+            "max_length": 3
+        },
+        "default_cluster_name": {
+            "description": "Стандартное имя кластера",
+            "min_length": 1,
+            "max_length": 255,
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "serialization_alias": "defaultClusterName",
+            "validation_alias": [
+                "defaultClusterName",
+                "default_cluster_name"
+            ]
+        },
+        "db_name": {
+            "description": "Имя базы данных. Актуально только для БД Postgre и GreenPlum",
+            "min_length": 1,
+            "max_length": 255,
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "serialization_alias": "dbName",
+            "validation_alias": [
+                "dbName",
+                "db_name"
+            ]
+        },
+        "labels": {
+            "description": "Тексты, которые описывают различные сущности системы на разных языках.",
+            "max_length": 100
+        }
+    },
+    "dimension_attribute": {
+        "name": {
+            "description": "Уникальное техническое имя объекта (имя поля в таблицах/имя таблицы).",
+            "pattern": "^[a-z0-9_]+$",
+            "min_length": 1,
+            "max_length": 32
+        },
+        "time_dependency": {
+            "description": "Зависимоть атрибута от времени.",
+            "serialization_alias": "timeDependency",
+            "validation_alias": [
+                "timeDependency",
+                "time_dependency"
+            ]
+        },
+        "labels": {
+            "description": "Тексты, которые описывают различные сущности системы на разных языках.",
+            "max_length": 100,
+            "serialization_alias": "labels",
+            "validation_alias": [
+                "replaced_labels",
+                "labels"
+            ]
+        },
+        "ref_type": {
+            "description": "Тип ссылочного поля",
+            "validation_alias": [
+                "type",
+                "ref_type"
+            ],
+            "serialization_alias": "type"
+        }
+    },
+    "pv_dictionary": {
+        "dictionary_name": {
+            "description": "Имя справочника в pv dictionaries",
+            "pattern": "^[a-zA-Z0-9]+$",
+            "min_length": 1,
+            "max_length": 255,
+            "validation_alias": [
+                "name",
+                "dictionary_name"
+            ],
+            "serialization_alias": "name"
+        },
+        "domain_name": {
+            "description": "Имя домена в pv dictionaries",
+            "pattern": "^[a-zA-Z0-9_]+$",
+            "min_length": 1,
+            "max_length": 255,
+            "validation_alias": [
+                "domainName",
+                "domain_name"
+            ],
+            "serialization_alias": "domainName"
+        },
+        "domain_label": {
+            "description": "Лейбл домена в pv dictionaries",
+            "pattern": "^[^\n\t]+$",
+            "min_length": 1,
+            "max_length": 255,
+            "validation_alias": [
+                "domainLabel",
+                "domain_label"
+            ],
+            "serialization_alias": "domainLabel"
+        }
+    },
+    "pv_dictionary_version": {
+        "version_code": {
+            "serialization_alias": "versionCode"
+        }
+    },
+    "dimension": {
+        "type": {
+            "description": "Технический тип данных.",
+            "max_length": 20
+        },
+        "models_names": {
+            "description": "",
+            "min_length": 0,
+            "max_length": 1000,
+            "serialization_alias": "models",
+            "validation_alias": [
+                "models_names",
+                "models"
+            ]
+        },
+        "auth_relevant": {
+            "description": "Релевантность проверке полномочий.",
+            "serialization_alias": "authorizationRelevant",
+            "validation_alias": [
+                "authorizationRelevant",
+                "auth_relevant"
+            ]
+        },
+        "is_virtual": {
+            "description": "Виртуальный объект",
+            "serialization_alias": "isVirtual",
+            "validation_alias": [
+                "isVirtual",
+                "is_virtual"
+            ]
+        },
+        "business_key_representation": {
+            "description": "Представление бизнес-ключа.",
+            "serialization_alias": "businessKeyRepresentation",
+            "validation_alias": [
+                "businessKeyRepresentation",
+                "business_key_representation"
+            ],
+            "pattern": "^[A-Z0-9_]+$",
+            "min_length": 1,
+            "max_length": 255
+        },
+        "data_access_method": {
+            "description": "Получения значений справочника не из таблицы БД, а, сгенерированных кодом.",
+            "serialization_alias": "dataAccessMethod",
+            "validation_alias": [
+                "dataAccessMethod",
+                "data_access_method"
+            ],
+            "pattern": "^[A-Z0-9_]+$",
+            "min_length": 1,
+            "max_length": 255
+        },
+        "texts_time_dependency": {
+            "description": "Зависимость текстов от времени.",
+            "serialization_alias": "textsTimeDependency",
+            "validation_alias": [
+                "textsTimeDependency",
+                "texts_time_dependency"
+            ]
+        },
+        "attributes_time_dependency": {
+            "description": "Зависимость атрибутов от времени.",
+            "serialization_alias": "attributesTimeDependency",
+            "validation_alias": [
+                "attributesTimeDependency",
+                "attributes_time_dependency"
+            ]
+        },
+        "texts_language_dependency": {
+            "description": "Зависимость текстов от языка.",
+            "serialization_alias": "textsLanguageDependency",
+            "validation_alias": [
+                "textsLanguageDependency",
+                "texts_language_dependency"
+            ]
+        },
+        "dimension_id": {
+            "description": "Уникальное техническое имя измерения",
+            "serialization_alias": "dimensionRef",
+            "validation_alias": [
+                "dimensionRef",
+                "dimension_name",
+                "dimension_id"
+            ],
+            "min_length": 1,
+            "max_length": 32,
+            "pattern": "^[a-z0-9_]+$"
+        },
+        "case_sensitive": {
+            "description": "Зависимость текстов от времени.",
+            "serialization_alias": "caseSensitive",
+            "validation_alias": [
+                "caseSensitive",
+                "case_sensitive"
+            ]
+        },
+        "text_table_id": {
+            "description": "Таблица текстов",
+            "serialization_alias": "textTable",
+            "validation_alias": [
+                "textTable",
+                "text_table_name",
+                "text_table_id"
+            ]
+        },
+        "attributes_table_id": {
+            "description": "Таблица атрибутов.",
+            "serialization_alias": "attributesTable",
+            "validation_alias": [
+                "attributesTable",
+                "attributes_table_name",
+                "attributes_table_id"
+            ]
+        },
+        "values_table_id": {
+            "description": "Таблица значений.",
+            "serialization_alias": "valuesTable",
+            "validation_alias": [
+                "valuesTable",
+                "values_table_name",
+                "values_table_id"
+            ]
+        },
+        "texts": {
+            "description": "Виды текста для значений измерения.",
+            "serialization_alias": "valueTexts",
+            "validation_alias": [
+                "valueTexts",
+                "linked_texts",
+                "texts"
+            ],
+            "max_length": 10
+        },
+        "attributes": {
+            "description": "Атрибуты измерения.",
+            "serialization_alias": "valueAttributes",
+            "validation_alias": [
+                "valueAttributes",
+                "attributes"
+            ],
+            "max_length": 1000
+        },
+        "pv_dictionary": {
+            "description": "Атрибуты pv dictionaries.",
+            "serialization_alias": "pvDictionary",
+            "validation_alias": [
+                "pvDictionary",
+                "pv_dictionary"
+            ]
+        },
+        "prompt": {
+            "description": "Промпты для LLM.",
+            "serialization_alias": "aiPrompt",
+            "validation_alias": [
+                "aiPrompt",
+                "prompt",
+                "ai_prompt"
+            ]
+        }
+    },
+    "text_link": {
+        "text_type": {
+            "description": "Тип текста"
+        }
+    },
+    "base_field": {
+        "name": {
+            "description": "Уникальное техническое имя объекта (имя поля в таблицах/имя таблицы).",
+            "min_length": 1,
+            "max_length": 32,
+            "pattern": "^[a-z0-9_]+$"
+        },
+        "type": {
+            "description": "Технический тип данных.",
+            "max_length": 20
+        },
+        "precision": {
+            "description": "Общая длина поля.",
+            "ge": 1,
+            "le": 1333
+        },
+        "labels": {
+            "description": "Тексты, которые описывают различные сущности системы на разных языках",
+            "max_length": 100
+        }
+    },
+    "base_field_type": {
+        "ref_object_type": {
+            "description": "Тип ссылочного объекта.",
+            "serialization_alias": "refObjectType",
+            "validation_alias": [
+                "refObjectType",
+                "ref_object_type"
+            ]
+        },
+        "ref_object": {
+            "description": "Ссылка на объект.",
+            "serialization_alias": "refObject",
+            "validation_alias": [
+                "refObject",
+                "ref_object"
+            ]
+        }
+    },
+    "hierarchy": {
+        "guid": {
+            "description": "GUID иерархии",
+            "min_length": 36,
+            "max_length": 36,
+            "pattern": "^[a-z0-9-]+$",
+            "validation_alias": [
+                "uuid",
+                "guid"
+            ],
+            "serialization_alias": "guid"
+        },
+        "name": {
+            "description": "Уникальное техническое имя объекта (имя поля в таблицах/имя таблицы).",
+            "min_length": 1,
+            "max_length": 32,
+            "pattern": "^[a-z0-9_]+$"
+        },
+        "time_dependency_type": {
+            "description": "Зависимость иерархии от времени.",
+            "serialization_alias": "timeDependencyType",
+            "validation_alias": [
+                "timeDependencyType",
+                "time_dependency_type"
+            ],
+            "pattern": "^[A-Z0-9_]+$",
+            "min_length": 1,
+            "max_length": 255
+        },
+        "versioning": {
+            "description": "Версионирование"
+        },
+        "dimension_id": {
+            "description": "Связанное измерение",
+            "serialization_alias": "dimensionRef",
+            "validation_alias": [
+                "dimensionRef",
+                "dimension_name",
+                "dimension_id"
+            ],
+            "min_length": 1,
+            "max_length": 32,
+            "pattern": "^[a-zA-Z0-9-_]+"
+        },
+        "data_storage_id": {
+            "description": "Связанное хранилище",
+            "serialization_alias": "dataStorageName",
+            "validation_alias": [
+                "dataStorageName",
+                "data_storage_name",
+                "data_storage_id"
+            ],
+            "min_length": 1,
+            "max_length": 64,
+            "pattern": "^[a-z0-9_]+$"
+        },
+        "labels": {
+            "description": "Тексты, которые описывают различные сущности системы на разных языках.",
+            "max_length": 100
+        },
+        "structure_type": {
+            "description": "Тип структуры иерархии.",
+            "serialization_alias": "structureType",
+            "validation_alias": [
+                "structureType",
+                "structure_type"
+            ],
+            "max_length": 20
+        },
+        "table": {
+            "description": "Таблица иерархии"
+        },
+        "pv_dictionary": {
+            "description": "description",
+            "serialization_alias": "pvDictionary",
+            "validation_alias": [
+                "pvDictionary",
+                "pv_dictionary"
+            ],
+            "name": {
+                "description": "Имя иерархии в PVD.",
+                "serialization_alias": "name",
+                "validation_alias": [
+                    "name"
+                ]
+            },
+            "domain_name": {
+                "description": "Имя домена в PVD.",
+                "serialization_alias": "domainName",
+                "validation_alias": [
+                    "domainName",
+                    "domain_name"
+                ]
+            },
+            "domain_label": {
+                "description": "Описание домена в PVD.",
+                "serialization_alias": "domainLabel",
+                "validation_alias": [
+                    "domainLabel",
+                    "domain_label"
+                ]
+            }
+        }
+    },
+    "label": {
+        "language": {
+            "description": "Язык текста",
+            "max_length": 5,
+            "pattern": "^[a-z]{2}-[a-z]{2}$",
+            "examples": [
+                "ru-ru"
+            ]
+        },
+        "type": {
+            "description": "Вид метки для описания объекта - короткий для вывода в поле ограниченной длины, - длинный для отображения подробного описания",
+            "max_length": 20
+        },
+        "text": {
+            "description": "текст",
+            "pattern": "^[^\n\t]+$",
+            "max_length": 255,
+            "min_length": 1
+        }
+    },
+    "dimension_value": {
+        "dimension_id": {
+            "description": "Уникальное техническое имя объекта (имя поля в таблицах/имя таблицы)",
+            "serialization_alias": "dimensionName",
+            "validation_alias": [
+                "dimensionName",
+                "dimension_name",
+                "dimension_id"
+            ],
+            "pattern": "^[a-z0-9_]+$",
+            "max_length": 32
+        },
+        "dimension_value": {
+            "description": "Значение dimension",
+            "serialization_alias": "dimensionValue",
+            "validation_alias": [
+                "dimensionValue",
+                "dimension_value"
+            ],
+            "max_length": 255,
+            "pattern": "^[a-zA-Z0-9_]+$"
+        }
+    },
+    "measure": {
+        "type": {
+            "description": "Технический тип данных.",
+            "max_length": 20
+        },
+        "precision": {
+            "description": "Общая длина поля.",
+            "ge": 1,
+            "le": 34
+        },
+        "scale": {
+            "description": "Количество знаков после запятой.",
+            "ge": 0,
+            "le": 34
+        },
+        "models_names": {
+            "description": "",
+            "min_length": 0,
+            "max_length": 1000,
+            "serialization_alias": "models",
+            "validation_alias": [
+                "models_names",
+                "models"
+            ]
+        },
+        "auth_relevant": {
+            "description": "Релевантность проверке полномочий.",
+            "serialization_alias": "authorizationRelevant",
+            "validation_alias": [
+                "authorizationRelevant",
+                "auth_relevant"
+            ]
+        },
+        "aggregation_type": {
+            "description": "Тип агрегации значений показателя или поля",
+            "serialization_alias": "aggregationType",
+            "validation_alias": [
+                "aggregationType",
+                "aggregation_type"
+            ],
+            "max_length": 20
+        },
+        "filter": {
+            "description": "Список уникальных значений dimension.",
+            "max_length": 100
+        },
+        "unit_of_measure": {
+            "description": "Единица измерения",
+            "validation_alias": [
+                "unitOfMeasure",
+                "unit_of_measure"
+            ],
+            "serialization_alias": "unitOfMeasure"
+        }
+    },
+    "model": {
+        "name": {
+            "description": "Уникальное техническое имя объекта (имя поля в таблицах/имя таблицы)",
+            "min_length": 1,
+            "max_length": 32,
+            "pattern": "^[a-zA-Z0-9-_]+"
+        },
+        "labels": {
+            "description": "Тексты, которые описывают различные сущности системы на разных языках",
+            "examples": [
+                [
+                    {
+                        "language": "ru-ru",
+                        "type": "SHORT",
+                        "text": "txt"
+                    }
+                ]
+            ],
+            "max_length": 100
+        },
+        "schema_name": {
+            "description": "Уникальное техническое имя объекта (имя поля в таблицах/имя таблицы)",
+            "min_length": 1,
+            "max_length": 255,
+            "pattern": "^[a-zA-Z0-9_]+$",
+            "serialization_alias": "schemaName",
+            "validation_alias": [
+                "schemaName",
+                "schema_name"
+            ]
+        },
+        "database_id": {
+            "description": "Имя базы данных",
+            "serialization_alias": "databaseName",
+            "validation_alias": [
+                "databaseName",
+                "database_name",
+                "database_id"
+            ],
+            "max_length": 32,
+            "min_length": 1,
+            "pattern": "[a-z0-9_]+$"
+        },
+        "dimension_tech_fields": {
+            "serialization_alias": "dimensionTechFields",
+            "validation_alias": [
+                "dimensionTechFields",
+                "dimension_tech_fields"
+            ]
+        }
+    },
+    "object_field": {
+        "name": {
+            "description": "Техническое имя поля в DSO или Composite",
+            "pattern": "^[a-z0-9_]+$",
+            "min_length": 1,
+            "max_length": 32
+        },
+        "labels": {
+            "description": "Тексты, которые описывают различные сущности системы на разных языках для",
+            "max_length": 100,
+            "serialization_alias": "labels",
+            "validation_alias": [
+                "replaced_labels",
+                "labels"
+            ]
+        },
+        "is_key": {
+            "description": "Является ли поле ключевым",
+            "serialization_alias": "isKey",
+            "validation_alias": [
+                "isKey",
+                "is_key"
+            ]
+        },
+        "semantic_type": {
+            "description": "Семантический тип поля",
+            "serialization_alias": "semanticType",
+            "validation_alias": [
+                "semanticType",
+                "semantic_type"
+            ]
+        },
+        "ref_type": {
+            "description": "Тип ссылочного поля",
+            "validation_alias": [
+                "type",
+                "ref_type"
+            ],
+            "serialization_alias": "type"
+        },
+        "sql_name": {
+            "description": "Имя поля в технической таблице",
+            "serialization_alias": "sqlName",
+            "validation_alias": [
+                "sqlName",
+                "sql_name"
+            ],
+            "pattern": "^[a-zA-Z0-9_/]+$",
+            "min_length": 1,
+            "max_length": 255
+        },
+        "sql_column_type": {
+            "description": "Тип поля в технической таблице",
+            "serialization_alias": "sqlColumnType",
+            "validation_alias": [
+                "sqlColumnType",
+                "sql_column_type"
+            ],
+            "pattern": "^[^\n\t]+$",
+            "min_length": 1,
+            "max_length": 32
+        }
+    },
+    "object_name_32": {
+        "description": "Уникальное техническое имя объекта (имя поля в таблицах/имя таблицы).",
+        "min_length": 1,
+        "max_length": 32,
+        "pattern": "^[a-z0-9_]+$"
+    },
+    "object_name_64": {
+        "description": "Уникальное техническое имя объекта (имя поля в таблицах/имя таблицы).",
+        "min_length": 1,
+        "max_length": 64,
+        "pattern": "^[a-z0-9_]+$"
+    },
+    "object_name": {
+        "name": {
+            "description": "Уникальное техническое имя объекта (имя поля в таблицах/имя таблицы).",
+            "min_length": 1,
+            "max_length": 64,
+            "pattern": "^[a-z0-9_]+$"
+        }
+    },
+    "table_specific_attribute": {
+        "name": {
+            "description": "Имя атрибута",
+            "min_length": 1,
+            "max_length": 255,
+            "pattern": "^[A-Z0-9_]+$"
+        },
+        "value": {
+            "description": "Значение атрибута",
+            "min_length": 1,
+            "max_length": 255,
+            "pattern": "^[a-zA-Z0-9_\\-\\(\\).,]+$"
+        }
+    },
+    "object_specific_attribute": {
+        "name": {
+            "description": "Имя атрибута",
+            "min_length": 1,
+            "max_length": 255,
+            "pattern": "^[A-Z0-9_]+$"
+        },
+        "value": {
+            "description": "Значение атрибута",
+            "min_length": 1,
+            "max_length": 255,
+            "pattern": "^[a-zA-Z0-9_\\-\\(\\).,]+$"
+        }
+    },
+    "table": {
+        "schema_name": {
+            "description": "Имя схемы базы данных.",
+            "serialization_alias": "schemaName",
+            "validation_alias": [
+                "schemaName",
+                "schema_name"
+            ],
+            "pattern": "^[a-zA-Z0-9_]+$",
+            "min_length": 1,
+            "max_length": 255
+        },
+        "name": {
+            "description": "Имя таблицы в базе данных.",
+            "pattern": "^[a-zA-Z0-9_]+$",
+            "min_length": 1,
+            "max_length": 255
+        },
+        "specific_attributes": {
+            "description": "Атрибуты таблицы специфические для системы",
+            "serialization_alias": "tableSpecificAttributes",
+            "validation_alias": [
+                "tableSpecificAttributes",
+                "specific_attributes"
+            ],
+            "max_length": 1000
+        }
+    },
+    "db_object": {
+        "schema_name": {
+            "description": "Имя схемы базы данных.",
+            "serialization_alias": "schemaName",
+            "validation_alias": [
+                "schemaName",
+                "schema_name"
+            ],
+            "pattern": "^[a-zA-Z0-9_]+$",
+            "min_length": 1,
+            "max_length": 255
+        },
+        "type": {
+            "description": "Тип объекта БД.",
+            "serialization_alias": "objectType",
+            "validation_alias": [
+                "type",
+                "objectType"
+            ]
+        },
+        "name": {
+            "description": "Имя таблицы в базе данных.",
+            "pattern": "^[^\n\t]+$",
+            "min_length": 1,
+            "max_length": 255
+        },
+        "specific_attributes": {
+            "description": "Атрибуты таблицы специфические для системы",
+            "serialization_alias": "objectSpecificAttributes",
+            "validation_alias": [
+                "objectSpecificAttributes",
+                "specific_attributes"
+            ],
+            "max_length": 1000
+        },
+        "m_name": {
+            "description": "Имя модели",
+            "serialization_alias": "modelName",
+            "validation_alias": [
+                "modelName",
+                "m_name"
+            ]
+        }
+    },
+    "tenant": {
+        "name": {
+            "description": "Уникальное техническое имя объекта (имя поля в таблицах/имя таблицы)",
+            "min_length": 1,
+            "max_length": 32,
+            "pattern": "^[a-z0-9_]+$"
+        },
+        "labels": {
+            "description": "Тексты, которые описывают различные сущности системы на разных языках",
+            "max_length": 100
+        },
+        "models": {
+            "description": "Модели.",
+            "max_length": 1000
+        },
+        "models_names": {
+            "description": "Модели.",
+            "max_length": 1000,
+            "serialization_alias": "models",
+            "validation_alias": [
+                "models_names",
+                "models"
+            ]
+        },
+        "search": {
+            "description": "",
+            "max_length": 556
+        },
+        "type": {
+            "description": "",
+            "max_length": 50,
+            "validation_alias": [
+                "data_storage",
+                "measure",
+                "dimension",
+                "composite"
+            ]
+        },
+        "modelName": {
+            "description": "Имя модели",
+            "max_length": 32
+        }
+    },
+    "datasource": {
+        "datasource": {
+            "description": "Уникальное техническое имя объекта (имя поля в таблицах/имя таблицы)",
+            "pattern": "^[^\n\t]+$",
+            "max_length": 255,
+            "min_length": 1
+        },
+        "datasource_field": {
+            "description": "Уникальное техническое имя объекта (имя поля в таблицах/имя таблицы)",
+            "serialization_alias": "datasourceField",
+            "pattern": "^[^\n\t]+$",
+            "max_length": 255,
+            "min_length": 1,
+            "validation_alias": [
+                "datasourceField",
+                "datasource_field"
+            ]
+        }
+    },
+    "composite_field": {
+        "datasource_links": {
+            "description": "Привязанные datasource",
+            "serialization_alias": "datasourceLinks",
+            "validation_alias": [
+                "datasourceLinks",
+                "datasource_links"
+            ],
+            "min_length": 0,
+            "max_length": 100
+        }
+    },
+    "composite_datasource": {
+        "name": {
+            "description": "Уникальное техническое имя объекта (имя поля в таблицах/имя таблицы)",
+            "min_length": 1,
+            "max_length": 255,
+            "pattern": "^[^\n\t]+$"
+        },
+        "schema_name": {
+            "description": "Имя схемы базы данных",
+            "min_length": 1,
+            "max_length": 255,
+            "pattern": "^[a-zA-Z0-9_]+$",
+            "serialization_alias": "schemaName",
+            "validation_alias": [
+                "schemaName",
+                "schema_name"
+            ]
+        },
+        "type": {
+            "description": "Тип источника данных"
+        }
+    },
+    "composite_link_fields_request": {
+        "left": {
+            "description": "Левое поле для связи в join"
+        },
+        "right": {
+            "description": "Правое поле для связи в join"
+        }
+    },
+    "data_storage_field": {
+        "is_key": {
+            "description": "Является ли поле ключевым",
+            "serialization_alias": "isKey",
+            "validation_alias": [
+                "isKey",
+                "is_key"
+            ]
+        },
+        "is_sharding_key": {
+            "description": "Является ли поле ключем шардирования (актуально для распределённых таблиц в БД ClickHouse)",
+            "serialization_alias": "isShardingKey",
+            "validation_alias": [
+                "isShardingKey",
+                "is_sharding_key"
+            ]
+        },
+        "is_tech_field": {
+            "serialization_alias": "isTechField",
+            "validation_alias": [
+                "isTechField",
+                "is_tech_field"
+            ]
+        }
+    },
+    "generated_object": {
+        "tenant_id": {
+            "description": "Тенант",
+            "serialization_alias": "tenant",
+            "validation_alias": [
+                "tenant",
+                "tenant_id"
+            ]
+        },
+        "model": {
+            "description": "Модель",
+            "serialization_alias": "modelName",
+            "validation_alias": [
+                "modelName",
+                "model"
+            ]
+        },
+        "object_name": {
+            "description": "Имя объекта",
+            "serialization_alias": "objectName",
+            "validation_alias": [
+                "objectName",
+                "object_name"
+            ]
+        },
+        "comment": {
+            "description": "Комментарий"
+        },
+        "result": {
+            "description": "Результат генерации"
+        }
+    },
+    "object_copy_response": {
+        "tenant_id": {
+            "description": "Тенант",
+            "serialization_alias": "tenant",
+            "validation_alias": [
+                "tenant",
+                "tenant_id"
+            ]
+        },
+        "object_name": {
+            "description": "Имя DSO",
+            "serialization_alias": "ObjectName",
+            "validation_alias": [
+                "ObjectName",
+                "object_name"
+            ]
+        },
+        "model_names": {
+            "description": "Модели, в которые копировать",
+            "serialization_alias": "modelNames",
+            "validation_alias": [
+                "modelNames",
+                "models"
+            ],
+            "min_length": 1
+        },
+        "comment": {
+            "description": "Комментарий"
+        },
+        "result": {
+            "description": "Результат копирования"
+        }
+    },
+    "object_copy_request": {
+        "model_names": {
+            "description": "Модели, в которые копировать",
+            "serialization_alias": "modelNames",
+            "validation_alias": [
+                "modelNames",
+                "model_names"
+            ],
+            "min_length": 1
+        },
+        "objects": {
+            "description": "Список объектов для копирования",
+            "min_length": 1
+        }
+    },
+    "group_description": {
+        "entity_name": {
+            "min_length": 1,
+            "max_length": 255,
+            "description": "Имя сущности",
+            "validation_alias": [
+                "entityName",
+                "entity_name"
+            ],
+            "pattern": "^[a-z0-9_]+$"
+
+        },
+        "description": {
+            "min_length": 1,
+            "max_length": 8192,
+            "validation_alias": [
+                "description",
+                "description"
+            ],
+            "pattern": "^[^\n\t]+$",
+            "description": "описание"
+        },
+        "synonyms": {
+            "min_length": 1,
+            "max_length": 8192,
+            "pattern": "^[^\n\t]+$",
+            "validation_alias": [
+                "synonyms",
+                "synonyms"
+            ],
+            "min_items": 0,
+            "max_items": 100
+        },
+        "few_shots": {
+            "min_length": 1,
+            "max_length": 8192,
+            "pattern": "^[^\n\t]+$",
+            "validation_alias": [
+                "fewShots",
+                "few_shots"
+            ],
+            "min_items": 0,
+            "max_items": 100
+        }
+    },
+    "ai_prompts": {
+        "analytic_role": {
+            "description": "Роль в аналитике",
+            "serialization_alias": "analyticRole",
+            "validation_alias": [
+                "analyticRole",
+                "analytic_role"
+            ],
+            "min_length": 1,
+            "max_length": 8192,
+            "min_items": 0,
+            "max_items": 100,
+            "pattern": "^[^\n\t]+$"
+        },
+        "purpose": {
+            "description": "Назначение",
+            "serialization_alias": "purpose",
+            "validation_alias": [
+                "purpose"
+            ],
+            "min_length": 1,
+            "max_length": 8192,
+            "min_items": 0,
+            "max_items": 100,
+            "pattern": "^[^\n\t]+$"
+        },
+        "key_features": {
+            "description": "Ключевые особенности",
+            "serialization_alias": "keyFeatures",
+            "validation_alias": [
+                "keyFeatures",
+                "key_features"
+            ],
+            "min_items": 0,
+            "max_items": 100,
+            "min_length": 1,
+            "max_length": 8192,
+            "pattern": "^[^\n\t]+$"
+        },
+        "data_type": {
+            "description": "Тип данных",
+            "serialization_alias": "dataType",
+            "validation_alias": [
+                "dataType",
+                "data_type"
+            ],
+            "min_length": 1,
+            "max_length": 255,
+            "min_items": 0,
+            "max_items": 100,
+            "pattern": "^[^\n\t]+$"
+        },
+        "subject_area": {
+            "description": "Предметная область",
+            "serialization_alias": "subjectArea",
+            "validation_alias": [
+                "subjectArea",
+                "subject_area"
+            ],
+            "min_items": 0,
+            "max_items": 100,
+            "min_length": 1,
+            "max_length": 255,
+            "pattern": "^[^\n\t]+$"
+        },
+        "example_questions": {
+            "description": "Вопросы для извлечения. Примеры вопросов для аналитики (анализ затрат, распределение расходов)",
+            "serialization_alias": "exampleQuestions",
+            "validation_alias": [
+                "exampleQuestions",
+                "example_questions"
+            ],
+            "min_length": 1,
+            "max_length": 255,
+            "pattern": "^[^\n\t]+$",
+            "min_items": 0,
+            "max_items": 100
+        },
+        "synonyms": {
+            "description": "Синонимы названия",
+            "serialization_alias": "synonyms",
+            "validation_alias": [
+                "synonyms"
+            ],
+            "min_length": 1,
+            "max_length": 255,
+            "pattern": "^[^\n\t]+$",
+            "min_items": 0,
+            "max_items": 100
+        },
+        "markers": {
+            "description": "Маркерные признаки",
+            "serialization_alias": "markers",
+            "validation_alias": [
+                "markers"
+            ],
+            "min_length": 1,
+            "max_length": 1024,
+            "pattern": "^[^\n\t]+$",
+            "min_items": 0,
+            "max_items": 100
+        },
+        "notes": {
+            "description": "Дополнительные примечания (описание сокращений, типов МВЗ)",
+            "serialization_alias": "notes",
+            "validation_alias": [
+                "notes"
+            ],
+            "min_length": 1,
+            "max_length": 1024,
+            "pattern": "^[^\n\t]+$",
+            "min_items": 0,
+            "max_items": 100
+        },
+        "related_dimensions": {
+            "description": "Список зависимых сущностей. Определяется как те измерения, атрибутами которого являются выбранные",
+            "serialization_alias": "relatedDimensions",
+            "validation_alias": [
+                "relatedDimensions",
+                "related_dimensions"
+            ],
+            "min_items": 0,
+            "max_items": 100
+        },
+        "ai_usage": {
+            "description": "Используется ли аналитика/группа в AI ассистентеИспользуется ли аналитика/группа в AI ассистенте"
+        },
+        "domain_id": {
+            "serialization_alias": "domainId",
+            "validation_alias": [
+                "domainId",
+                "domain_id"
+            ],
+            "min_length": 1,
+            "max_length": 255,
+            "description": "Отчет / область (для расширения функционала ассистента в Q4: выбор среди нескольких отчетов)"
+        },
+        "fallback_to_llm_values": {
+            "description": ""
+        },
+        "vector_search": {
+            "description": "Есть ли в ВБД \n(можем искать значение аналитики и использовать в фильтре)"
+        },
+        "preferable_columns": {
+            "description": "Размещаем в столбце или в строке (default=False аналитика в столбец)"
+        },
+        "description": {
+            "min_length": 1,
+            "max_length": 8192,
+            "validation_alias": [
+                "description",
+                "description"
+            ],
+            "description": "Даем чуть более подробное определение сущности. Старайтесь использовать общеупотребимые слова, описание должно понятно даже ребенку. Описание должно раскрывать, как именно модель должна по тексту понять, что упоминается именно эта аналитика. Не требуется расписывать методологию, классификации и иерархию этого показателя в системе показателей."
+        },
+        "few_shots": {
+            "description": "Приводим примеры фраз и идентификаций",
+            "min_length": 1,
+            "max_length": 255,
+            "pattern": "^[^\n\t]+$",
+            "serialization_alias": "fewShots",
+            "validation_alias": [
+                "fewShots",
+                "few_shots"
+            ]
+        }
+    }
+}
