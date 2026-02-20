@@ -1,4 +1,4 @@
-"""Клиент для работы с PV Dictionaries"""
+"""РљР»РёРµРЅС‚ РґР»СЏ СЂР°Р±РѕС‚С‹ СЃ PV Dictionaries"""
 
 from http import HTTPStatus
 from urllib.parse import urljoin
@@ -23,7 +23,7 @@ logger = EPMPYLogger(__name__)
 
 
 class ClientPVDictionaries:
-    """Клиент для работы с PV Dictionaries"""
+    """РљР»РёРµРЅС‚ РґР»СЏ СЂР°Р±РѕС‚С‹ СЃ PV Dictionaries"""
 
     def __init__(self, ref_mapping: dict[str, Dimension] | None = None) -> None:
         self.cert, self.verify = get_cert_and_verify_for_httpx(
@@ -42,7 +42,7 @@ class ClientPVDictionaries:
             header: header_value for header, header_value in self.headers.items() if header_value is not None
         }
         if not settings.PV_DICTIONARIES_URL:
-            raise ValueError("Переменная PV_DICTIONARIES_URL не найдена.")
+            raise ValueError("РџРµСЂРµРјРµРЅРЅР°СЏ PV_DICTIONARIES_URL РЅРµ РЅР°Р№РґРµРЅР°.")
 
     async def _create_dictionary(
         self,
@@ -52,7 +52,7 @@ class ClientPVDictionaries:
         with_attrs: bool = True,
         with_texts: bool = True,
     ) -> PVDictionaryVersion:
-        """Создать dimension в PV Dictionaries с клиентом."""
+        """РЎРѕР·РґР°С‚СЊ dimension РІ PV Dictionaries СЃ РєР»РёРµРЅС‚РѕРј."""
         url = urljoin(
             settings.PV_DICTIONARIES_URL,
             settings.PV_DICTIONARIES_CREATE_DICTIONARY % settings.PV_DICTIONARIES_TENANT_NAME,
@@ -79,7 +79,7 @@ class ClientPVDictionaries:
         with_attrs: bool = True,
         with_texts: bool = True,
     ) -> PVDictionaryVersion:
-        """Обновить dimension в PV Dictionaries с клиентом."""
+        """РћР±РЅРѕРІРёС‚СЊ dimension РІ PV Dictionaries СЃ РєР»РёРµРЅС‚РѕРј."""
         url = urljoin(
             settings.PV_DICTIONARIES_URL,
             settings.PV_DICTIONARIES_CREATE_DICTIONARY % settings.PV_DICTIONARIES_TENANT_NAME,
@@ -111,7 +111,7 @@ class ClientPVDictionaries:
         with_attrs: bool = True,
         with_texts: bool = True,
     ) -> PVDictionaryVersion:
-        """Создать dimension в PV Dictionaries."""
+        """РЎРѕР·РґР°С‚СЊ dimension РІ PV Dictionaries."""
         try:
             async with AsyncClient(
                 cert=self.cert, verify=self.verify if self.verify else False, headers=self.headers
@@ -137,7 +137,7 @@ class ClientPVDictionaries:
         with_attrs: bool = True,
         with_texts: bool = True,
     ) -> PVDictionaryVersion:
-        """Создать dimension в PV Dictionaries."""
+        """РЎРѕР·РґР°С‚СЊ dimension РІ PV Dictionaries."""
         try:
             async with AsyncClient(
                 cert=self.cert, verify=self.verify if self.verify else False, headers=self.headers
@@ -157,7 +157,7 @@ class ClientPVDictionaries:
         return result
 
     async def _create_version_dictionary(self, client: AsyncClient, version: PVDictionaryVersion) -> int:
-        """Создать version в PV Dictionaries."""
+        """РЎРѕР·РґР°С‚СЊ version РІ PV Dictionaries."""
         url = urljoin(
             settings.PV_DICTIONARIES_URL,
             settings.PV_DICTIONARIES_CREATE_VERSION % (settings.PV_DICTIONARIES_TENANT_NAME, version.object_name),
@@ -171,7 +171,7 @@ class ClientPVDictionaries:
         return saved_version_code["versionCode"]
 
     async def create_version_dictionary(self, version: PVDictionaryVersion) -> int:
-        """Создать version в PV Dictionaries."""
+        """РЎРѕР·РґР°С‚СЊ version РІ PV Dictionaries."""
         try:
             async with AsyncClient(
                 cert=self.cert, verify=self.verify if self.verify else False, headers=self.headers
@@ -191,7 +191,7 @@ class ClientPVDictionaries:
         return saved_version_code
 
     async def _activate_version_dictionary(self, client: AsyncClient, version: int, dictionary_name: str) -> None:
-        """Активировать версию dictionary."""
+        """РђРєС‚РёРІРёСЂРѕРІР°С‚СЊ РІРµСЂСЃРёСЋ dictionary."""
         url = urljoin(
             settings.PV_DICTIONARIES_URL,
             settings.PV_DICTIONARIES_ACTIVATE_VERSION
@@ -202,14 +202,20 @@ class ClientPVDictionaries:
         response.raise_for_status()
         return None
 
+    @staticmethod
+    def _print_pvd_request(method: str, url: str, headers: dict, body: dict | None = None) -> None:
+        """Печатает отправляемый запрос в PVD."""
+        print(f"PVD REQUEST method={method}; url={url}; headers={headers}; body={body}")
+
     async def create_hierarchy(self, payload: PVHierarchyPayload) -> dict:
-        """Создать иерархию в PVD."""
+        """РЎРѕР·РґР°С‚СЊ РёРµСЂР°СЂС…РёСЋ РІ PVD."""
         try:
             async with AsyncClient(
                 cert=self.cert, verify=self.verify if self.verify else False, headers=self.headers
             ) as client:
                 url = urljoin(settings.PV_DICTIONARIES_URL, settings.PV_HIERARCHIES_CREATE_URL)
                 body = payload.model_dump(by_alias=True, exclude_none=True)
+                self._print_pvd_request("POST", url, self.headers, body)
                 logger.debug("PVD hierarchy create request: url=%s, body=%s", url, body)
                 response = await client.post(url, json=body)
                 response.raise_for_status()
@@ -227,7 +233,7 @@ class ClientPVDictionaries:
             raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
 
     async def update_hierarchy(self, hierarchy_name: str, payload: PVHierarchyPayload) -> dict:
-        """Обновить иерархию в PVD."""
+        """РћР±РЅРѕРІРёС‚СЊ РёРµСЂР°СЂС…РёСЋ РІ PVD."""
         try:
             async with AsyncClient(
                 cert=self.cert, verify=self.verify if self.verify else False, headers=self.headers
@@ -237,6 +243,7 @@ class ClientPVDictionaries:
                     settings.PV_HIERARCHIES_UPDATE_URL % hierarchy_name,
                 )
                 body = payload.model_dump(by_alias=True, exclude_none=True)
+                self._print_pvd_request("PUT", url, self.headers, body)
                 logger.debug("PVD hierarchy update request: url=%s, body=%s", url, body)
                 response = await client.put(url, json=body)
                 response.raise_for_status()
@@ -254,7 +261,7 @@ class ClientPVDictionaries:
             raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
 
     async def delete_hierarchy(self, hierarchy_name: str) -> None:
-        """Удалить иерархию из PVD."""
+        """РЈРґР°Р»РёС‚СЊ РёРµСЂР°СЂС…РёСЋ РёР· PVD."""
         try:
             async with AsyncClient(
                 cert=self.cert, verify=self.verify if self.verify else False, headers=self.headers
@@ -263,6 +270,7 @@ class ClientPVDictionaries:
                     settings.PV_DICTIONARIES_URL,
                     settings.PV_HIERARCHIES_DELETE_URL % hierarchy_name,
                 )
+                self._print_pvd_request("DELETE", url, self.headers, None)
                 logger.debug("Deleting hierarchy from PVD: %s", hierarchy_name)
                 response = await client.delete(url)
                 response.raise_for_status()
@@ -286,7 +294,7 @@ class ClientPVDictionaries:
             raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
 
     async def activate_version_dictionary(self, version: int, dictionary_name: str) -> None:
-        """Активировать версию dictionary."""
+        """РђРєС‚РёРІРёСЂРѕРІР°С‚СЊ РІРµСЂСЃРёСЋ dictionary."""
         try:
             async with AsyncClient(
                 cert=self.cert, verify=self.verify if self.verify else False, headers=self.headers
@@ -310,7 +318,7 @@ class ClientPVDictionaries:
         client: AsyncClient,
         pv_name: str,
     ) -> None:
-        """Удалить dimension в PV Dictionaries с клиентом."""
+        """РЈРґР°Р»РёС‚СЊ dimension РІ PV Dictionaries СЃ РєР»РёРµРЅС‚РѕРј."""
         url = urljoin(
             settings.PV_DICTIONARIES_URL,
             settings.PV_DICTIONARIES_DELETE_DICTIONARY % settings.PV_DICTIONARIES_TENANT_NAME,
@@ -327,7 +335,7 @@ class ClientPVDictionaries:
         self,
         pv_name: str,
     ) -> None:
-        """Удалить dimension в PV Dictionaries."""
+        """РЈРґР°Р»РёС‚СЊ dimension РІ PV Dictionaries."""
         try:
             async with AsyncClient(
                 cert=self.cert, verify=self.verify if self.verify else False, headers=self.headers
@@ -348,7 +356,7 @@ class ClientPVDictionaries:
     async def _get_dictionary_or_none_by_client(
         self, client: AsyncClient, domain_name: str, object_name: str
     ) -> PVDictionaryVersion | None:
-        """Получить dictionary из PV Dictionaries."""
+        """РџРѕР»СѓС‡РёС‚СЊ dictionary РёР· PV Dictionaries."""
         url = f"{urljoin(settings.PV_DICTIONARIES_URL, settings.PV_DICTIONARIES_GET_DICTIONARY % settings.PV_DICTIONARIES_TENANT_NAME)}?domain.name={domain_name}&name={object_name}"
         response = await client.get(url)
         if response.status_code == HTTPStatus.OK:
@@ -370,7 +378,7 @@ class ClientPVDictionaries:
         return None
 
     async def get_dictionary_or_none(self, domain_name: str, object_name: str) -> PVDictionaryVersion | None:
-        """Получить dictionary в PV Dictionaries."""
+        """РџРѕР»СѓС‡РёС‚СЊ dictionary РІ PV Dictionaries."""
         try:
             async with AsyncClient(
                 cert=self.cert, verify=self.verify if self.verify else False, headers=self.headers
@@ -388,3 +396,4 @@ class ClientPVDictionaries:
                 logger.audit(F9, host=ip_address if ip_address else "unknown", dns_name=dns_name)
             raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=exc.response.text)
         return result
+
