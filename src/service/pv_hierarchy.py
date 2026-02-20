@@ -113,7 +113,35 @@ class HierarchyPvdService:
             )
         return f"{base_dimension.pv_dictionary.object_name}__{snake_to_camel(hierarchy_orm.name)}"
 
-    def _build_pvd_payload(self, hierarchy_orm: HierarchyMeta) -> PVHierarchyPayload:
+    async def _build_dictionary_name_list(
+        self, hierarchy_orm: HierarchyMeta, tenant_id: str, model_name: str
+    ) -> list[str]:
+        """
+        Формирует список словарей измерений для payload PVD.
+
+        Использует явный запрос связей hierarchy->dimensions из БД, чтобы избежать
+        несинхронизированного состояния ORM-коллекции base_dimensions в рамках одной сессии.
+        """
+        dimensions = await self.hierarchy_repo.get_base_dimension_names_by_hierarchy_id(hierarchy_orm.id)
+        dictionary_name_list: list[str] = []
+        for dim_name, _ in dimensions:
+            dimension = await self.dimension_service.get_dimension_orm_model(
+                tenant_id=tenant_id,
+                model_name=model_name,
+                name=dim_name,
+            )
+            if (
+                dimension
+                and dimension.pv_dictionary
+                and dimension.pv_dictionary.object_name
+                and dimension.pv_dictionary.object_name not in dictionary_name_list
+            ):
+                dictionary_name_list.append(dimension.pv_dictionary.object_name)
+        return dictionary_name_list
+
+    async def _build_pvd_payload(
+        self, hierarchy_orm: HierarchyMeta, tenant_id: str, model_name: str
+    ) -> PVHierarchyPayload:
         """
         Формирует payload для отправки в PVD из ORM-объекта иерархии.
 
@@ -123,9 +151,11 @@ class HierarchyPvdService:
         Returns:
             PVHierarchyPayload: Сформированный payload.
         """
-        dictionary_name_list = [
-            dim.pv_dictionary.object_name for dim in hierarchy_orm.base_dimensions if dim.pv_dictionary is not None
-        ]
+        dictionary_name_list = await self._build_dictionary_name_list(
+            hierarchy_orm=hierarchy_orm,
+            tenant_id=tenant_id,
+            model_name=model_name,
+        )
         display_name, description = self._extract_labels_for_pvd(hierarchy_orm.labels)
 
         return PVHierarchyPayload(
@@ -192,9 +222,11 @@ class HierarchyPvdService:
             hierarchy_orm.pv_dictionary.domain_label = domain_label
             self.hierarchy_repo.session.add(hierarchy_orm.pv_dictionary)
         else:
-            dictionary_name_list = [
-                dim.pv_dictionary.object_name for dim in hierarchy_orm.base_dimensions if dim.pv_dictionary is not None
-            ]
+            dictionary_name_list = await self._build_dictionary_name_list(
+                hierarchy_orm=hierarchy_orm,
+                tenant_id=tenant_id,
+                model_name=model_name,
+            )
             display_name, description = self._extract_labels_for_pvd(hierarchy_orm.labels)
 
             payload = PVHierarchyPayload(
@@ -280,7 +312,11 @@ class HierarchyPvdService:
                 commit=commit,
             )
 
-        payload = self._build_pvd_payload(hierarchy_orm)
+        payload = await self._build_pvd_payload(
+            hierarchy_orm=hierarchy_orm,
+            tenant_id=tenant_id,
+            model_name=model_name,
+        )
 
         client = ClientPVDictionaries()
         await client.update_hierarchy(hierarchy_orm.pv_dictionary.object_name, payload)
