@@ -12,10 +12,12 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, with_loader_criteria
 
+from src.db.any_field import AnyField
 from src.db.composite import (
     Composite,
     CompositeDatasource,
     CompositeField,
+    CompositeFieldLabel,
     CompositeLabel,
     CompositeLinkFields,
     CompositeModelRelation,
@@ -23,6 +25,8 @@ from src.db.composite import (
 )
 from src.db.data_storage import DataStorageField
 from src.db.database_object import DatabaseObject
+from src.db.dimension import Dimension
+from src.db.measure import Measure
 from src.db.model import Model
 from src.models.any_field import AnyFieldTypeEnum
 from src.models.composite import (
@@ -49,6 +53,7 @@ from src.repository.utils import (
     check_exists_object_in_models,
     convert_field_to_orm,
     convert_labels_list_to_orm,
+    convert_ref_type_to_orm,
     get_database_schema_database_object_mapping,
     get_object_filtred_by_model_name,
     get_select_query_with_offset_limit_order,
@@ -214,6 +219,108 @@ class CompositeRepository:
             else:
                 raise ValueError("Unknown datasource type")
         return result
+
+    async def _update_composite_field_attrs(
+        self,
+        field: CompositeField,
+        field_dict: dict[str, Any],
+        tenant_id: str,
+        model_names: list[str],
+        datasources_info_dict: dict[str, dict[str, Any]],
+    ) -> None:
+        """
+        Обновляет атрибуты существующего ORM-объекта CompositeField из словаря,
+        сохраняя id строки в БД (без DELETE + INSERT).
+
+        Args:
+            field (CompositeField): Существующий ORM-объект поля.
+            field_dict (dict[str, Any]): Словарь с новыми значениями атрибутов поля.
+            tenant_id (str): Идентификатор тенанта.
+            model_names (list[str]): Список имён моделей для резолва ссылок.
+            datasources_info_dict (dict[str, dict[str, Any]]): Словарь информации о datasource'ах.
+        """
+        old_any_field = field.any_field
+
+        datasource_links = self._convert_datasource_links_to_orm(
+            field_dict.pop("datasource_links", []), datasources_info_dict
+        )
+
+        ref_type = field_dict.pop("ref_type")
+        field_dict.pop("sql_column_type", None)
+        object_field = await convert_ref_type_to_orm(self.session, tenant_id, model_names, ref_type)
+
+        field.labels = convert_labels_list_to_orm(field_dict.pop("labels", []), CompositeFieldLabel)
+        field.semantic_type = field_dict.get("semantic_type", field.semantic_type)
+        field.sql_name = field_dict.get("sql_name", field.sql_name)
+        field.field_type = ref_type["ref_object_type"]
+        field.datasource_links = datasource_links
+
+        field.dimension_id = None
+        field.dimension = None
+        field.measure_id = None
+        field.measure = None
+        field.any_field = None
+
+        if field.field_type == BaseFieldTypeEnum.MEASURE and isinstance(object_field, Measure):
+            field.measure_id = object_field.id
+            field.measure = object_field
+        elif field.field_type == BaseFieldTypeEnum.DIMENSION and isinstance(object_field, Dimension):
+            field.dimension_id = object_field.id
+            field.dimension = object_field
+        elif field.field_type == BaseFieldTypeEnum.ANYFIELD and isinstance(object_field, AnyField):
+            field.any_field = object_field
+        elif object_field is not None:
+            raise ValueError("object_field has unknown type.")
+
+        if old_any_field is not None and old_any_field is not field.any_field:
+            await self.session.delete(old_any_field)
+
+    async def _update_composite_fields_in_place(
+        self,
+        composite_orm: Composite,
+        new_fields_dicts: list[dict[str, Any]],
+        tenant_id: str,
+        model_names: list[str],
+        datasources_info_dict: dict[str, dict[str, Any]],
+    ) -> None:
+        """
+        Обновляет поля Composite на месте в InstrumentedList, без замены коллекции.
+        Сопоставляет существующие поля по имени и обновляет их атрибуты,
+        новые поля добавляет через append, отсутствующие — удаляет через remove.
+        Сохраняет id существующих строк, что предотвращает нарушение FK из composite_link_fields.
+
+        Args:
+            composite_orm (Composite): ORM-объект композита, чья коллекция fields мутируется.
+            new_fields_dicts (list[dict[str, Any]]): Список словарей с новыми значениями полей.
+            tenant_id (str): Идентификатор тенанта.
+            model_names (list[str]): Список имён моделей для резолва ссылок.
+            datasources_info_dict (dict[str, dict[str, Any]]): Словарь информации о datasource'ах.
+        """
+        existing_by_name: dict[str, CompositeField] = {f.name: f for f in composite_orm.fields}
+        new_field_names: set[str] = set()
+
+        for field_dict in new_fields_dicts:
+            field_name = field_dict["name"]
+            new_field_names.add(field_name)
+
+            if field_name in existing_by_name:
+                await self._update_composite_field_attrs(
+                    existing_by_name[field_name], field_dict, tenant_id, model_names, datasources_info_dict
+                )
+            else:
+                field_dict["datasource_links"] = self._convert_datasource_links_to_orm(
+                    field_dict.pop("datasource_links", []), datasources_info_dict
+                )
+                model_field = await convert_field_to_orm(
+                    self.session, field_dict, tenant_id, model_names, CompositeField
+                )
+                if not isinstance(model_field, CompositeField):
+                    raise ValueError("Failed to cast model_field to CompositeField")
+                composite_orm.fields.append(model_field)
+
+        for field_name, field in existing_by_name.items():
+            if field_name not in new_field_names:
+                composite_orm.fields.remove(field)
 
     async def _convert_field_object_list_to_orm(
         self,
@@ -851,12 +958,11 @@ class CompositeRepository:
         regenerate_sql_expression = False
         model_names = [composite_model.name for composite_model in original_composite.models]
         if composite_dict.get("fields") is not None:
-            original_composite.fields = []
-            await self.session.flush()
-            original_composite.fields = await self._convert_field_object_list_to_orm(
+            await self._update_composite_fields_in_place(
+                composite_orm=original_composite,
+                new_fields_dicts=copy.deepcopy(composite_dict.pop("fields")),
                 tenant_id=model.tenant_id,
                 model_names=model_names,
-                fields=copy.deepcopy(composite_dict.pop("fields")),
                 datasources_info_dict=datasources_info_dict,
             )
             regenerate_sql_expression = True
