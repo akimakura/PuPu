@@ -139,7 +139,7 @@ class DataStorageField(Base, FieldMixin, Versioned):
         back_populates="fields", foreign_keys=[data_storage_id], lazy="joined"
     )
     labels: Mapped[list["DataStorageFieldLabel"]] = relationship(
-        back_populates="data_storage_field", lazy="selectin", cascade="all,delete"
+        back_populates="data_storage_field", lazy="selectin", cascade="all,delete-orphan"
     )
     dimension: Mapped[Optional["Dimension"]] = relationship(back_populates="data_storage_fields", lazy="selectin")
     measure: Mapped[Optional["Measure"]] = relationship(back_populates="data_storage_fields", lazy="selectin")

@@ -33,7 +33,10 @@ class GeneratorRepository:
 
     @classmethod
     async def get_alter_database_objects_sql_expressions(
-        cls, datastorage: DataStorage, model: Model, sql_expressions: list[str]
+        cls,
+        datastorage: DataStorage,
+        model: Model,
+        sql_expressions: list[str],
     ) -> list[str]:
         """
         Собрать из сырых sql выражений (alter) запросы для конкретной базы данных.

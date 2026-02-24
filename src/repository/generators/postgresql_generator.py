@@ -394,31 +394,15 @@ class GeneratorPostgreSQLRepository(GeneratorRepository):
             list[str]: готовые запросы
         """
         database_objects = get_filtred_database_object_by_data_storage(datastorage, model.name)
-        database = DatabaseModel.model_validate(model.database)
 
-        table_names = [db_obj.name for db_obj in database_objects]
-        schemas = {db_obj.schema_name for db_obj in database_objects if db_obj.schema_name}
-        dependent_views: list[dict[str, str]] = []
-        for schema in schemas:
-            dependent_views.extend(await cls._find_all_dependent_views(database, schema, table_names))
-
-        drop_views_sql: list[str] = []
-        create_views_sql: list[str] = []
-        for view in reversed(dependent_views):
-            drop_views_sql.append(f"DROP VIEW IF EXISTS {view['view_schema']}.{view['view_name']}")
-        for view in dependent_views:
-            create_views_sql.append(
-                f"CREATE VIEW {view['view_schema']}.{view['view_name']} AS {view['view_definition']}"
-            )
-
-        alter_sql: list[str] = []
+        sql_expressions_for_execute = []
         for database_object in database_objects:
             for sql_expression in sql_expressions:
-                alter_sql.append(
+                sql_expressions_for_execute.append(
                     f"ALTER TABLE {database_object.schema_name}.{database_object.name} {sql_expression}"
                 )
 
-        return drop_views_sql + alter_sql + create_views_sql
+        return sql_expressions_for_execute
 
     @classmethod
     async def update_composite(cls, composite: Composite, model: Model, sql_expression: str) -> Optional[list[str]]:

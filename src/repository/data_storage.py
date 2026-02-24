@@ -136,7 +136,13 @@ class DataStorageRepository:
         field_dict.pop("sql_column_type", None)
         object_field = await convert_ref_type_to_orm(self.session, tenant_id, model_names, ref_type)
 
-        field.labels = convert_labels_list_to_orm(field_dict.pop("labels", []), DataStorageFieldLabel)
+        labels = field_dict.pop("labels", None)
+        if labels is not None:
+            converted_labels = convert_labels_list_to_orm(labels, DataStorageFieldLabel)
+            current_labels_values = {(label.language, label.type, label.text) for label in field.labels}
+            new_labels_values = {(label.language, label.type, label.text) for label in converted_labels}
+            if current_labels_values != new_labels_values:
+                field.labels = converted_labels
         field.semantic_type = field_dict.get("semantic_type", field.semantic_type)
         field.sql_name = field_dict.get("sql_name", field.sql_name)
         field.is_key = field_dict.get("is_key", field.is_key)
@@ -1438,7 +1444,7 @@ class DataStorageRepository:
         Returns:
             DataStorageOrm: Обновленное хранилище данных.
         """
-        data_storage_dict = data_storage.model_dump(mode="json", exclude_none=True)
+        data_storage_dict = data_storage.model_dump(mode="json", exclude_none=True, exclude_unset=True)
         data_storage_dict.pop("log_data_storage_name", None)
         original_data_storage = await self.get_datastorage_orm_by_session(
             tenant_id=tenant_id, model_name=None, name=name
@@ -1453,11 +1459,12 @@ class DataStorageRepository:
 
         data_storage_dict.pop("table", {})
         data_storage_dict.pop("database_objects", [])
-        if data_storage.fields is not None:
+        fields_payload = data_storage_dict.get("fields")
+        if fields_payload is not None and data_storage.fields is not None:
             original_data_storage.sharding_key = self._generate_sharding_key_by_fields(data_storage.fields)
             await self._update_fields_in_place(
                 data_storage_orm=original_data_storage,
-                new_fields_dicts=copy.deepcopy(data_storage_dict.get("fields", [])),
+                new_fields_dicts=copy.deepcopy(fields_payload),
                 tenant_id=tenant_id,
                 model_names=[model.name for m in original_data_storage.models],
             )
@@ -1568,7 +1575,7 @@ class DataStorageRepository:
             raise NoResultFound(
                 f"DataStorage with tenant_id={tenant_id}, model_name={model_name} and name={name} not found."
             )
-        data_storage_dict = data_storage_edit_model.model_dump(mode="json", exclude_none=True)
+        data_storage_dict = data_storage_edit_model.model_dump(mode="json", exclude_none=True, exclude_unset=True)
         prev_log_data_storage = None
         if prev_data_storage.log_data_storage:
             prev_log_data_storage = await self.get_datastorage_orm_by_session(
