@@ -241,19 +241,30 @@ class CompositeRepository:
         """
         old_any_field = field.any_field
 
-        datasource_links = self._convert_datasource_links_to_orm(
-            field_dict.pop("datasource_links", []), datasources_info_dict
-        )
+        datasource_links = None
+        datasource_links_payload = field_dict.pop("datasource_links", None)
+        if datasource_links_payload is not None:
+            datasource_links = self._convert_datasource_links_to_orm(
+                datasource_links_payload,
+                datasources_info_dict,
+            )
 
         ref_type = field_dict.pop("ref_type")
         field_dict.pop("sql_column_type", None)
         object_field = await convert_ref_type_to_orm(self.session, tenant_id, model_names, ref_type)
 
-        field.labels = convert_labels_list_to_orm(field_dict.pop("labels", []), CompositeFieldLabel)
+        labels = field_dict.pop("labels", None)
+        if labels is not None:
+            converted_labels = convert_labels_list_to_orm(labels, CompositeFieldLabel)
+            current_labels_values = {(label.language, label.type, label.text) for label in field.labels}
+            new_labels_values = {(label.language, label.type, label.text) for label in converted_labels}
+            if current_labels_values != new_labels_values:
+                field.labels = converted_labels
         field.semantic_type = field_dict.get("semantic_type", field.semantic_type)
         field.sql_name = field_dict.get("sql_name", field.sql_name)
         field.field_type = ref_type["ref_object_type"]
-        field.datasource_links = datasource_links
+        if datasource_links is not None:
+            field.datasource_links = datasource_links
 
         field.dimension_id = None
         field.dimension = None
@@ -1009,7 +1020,7 @@ class CompositeRepository:
         Raises:
             NoResultFound: Если композит с указанными параметрами не найден.
         """
-        composite_dict = composite.model_dump(mode="json", exclude_none=True)
+        composite_dict = composite.model_dump(mode="json", exclude_none=True, exclude_unset=True)
         original_composite = await self.get_composite_orm_by_session(tenant_id=tenant_id, model_name=None, name=name)
         if original_composite is None:
             raise NoResultFound(

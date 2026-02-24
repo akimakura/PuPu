@@ -211,7 +211,7 @@ class CompositeField(Base, FieldMixin, Versioned):
     # Relationships
     composite: Mapped["Composite"] = relationship(back_populates="fields", foreign_keys=[composite_id], lazy="joined")
     labels: Mapped[list["CompositeFieldLabel"]] = relationship(
-        back_populates="composite_field", lazy="selectin", cascade="all,delete"
+        back_populates="composite_field", lazy="selectin", cascade="all,delete-orphan"
     )
     dimension: Mapped[Optional["Dimension"]] = relationship(back_populates="composite_fields", lazy="selectin")
     measure: Mapped[Optional["Measure"]] = relationship(back_populates="composite_fields", lazy="selectin")
