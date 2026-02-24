@@ -257,6 +257,12 @@ async def convert_field_to_orm(
     object_field = await convert_ref_type_to_orm(session, tenant_id, model_names, ref_type)
     field["labels"] = convert_labels_list_to_orm(field.pop("labels", []), model_label_type)
     field["field_type"] = ref_type["ref_object_type"]
+    # SQLAlchemy column defaults are applied on flush/insert, while we validate ORM object earlier.
+    # Ensure explicit booleans for new DataStorageField objects.
+    if model_type == DataStorageField:
+        field["is_key"] = False if field.get("is_key") is None else field.get("is_key")
+        field["is_sharding_key"] = False if field.get("is_sharding_key") is None else field.get("is_sharding_key")
+        field["is_tech_field"] = False if field.get("is_tech_field") is None else field.get("is_tech_field")
     if field["field_type"] == BaseFieldTypeEnum.MEASURE and isinstance(object_field, Measure):
         field["measure_id"] = object_field.id
         measure = object_field

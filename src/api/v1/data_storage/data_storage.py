@@ -21,7 +21,7 @@ from src.cache.types import CacheHeaderEnum
 from src.models.copy_model import CopyModelRequest, DetailsObjectCopyReponse
 from src.models.data_storage import DataStorage, DataStorageCreateRequest, DataStorageEditRequest, DataStorageV1
 from src.models.database_object import DatabaseObject, DatabaseObjectRequest
-from src.models.exceptions import SemanticObjectRelationException, ViewDependentColumnChangeException
+from src.models.exceptions import SemanticObjectRelationException
 from src.models.model_import import ImportFromFileResponse
 from src.models.permissions import PermissionEnum
 from src.models.request_params import Pagination
@@ -428,13 +428,6 @@ async def update_data_storage_by_name(
         logger.exception(reason)
         audit_kwargs["reason"] = reason
         raise HTTPExceptionWithAuditLogging(audit_kwargs=audit_kwargs, status_code=HTTPStatus.NOT_FOUND, detail=reason)
-    except ViewDependentColumnChangeException as ex:
-        reason = "BAD_REQUEST: " + str(ex)
-        logger.exception(reason)
-        audit_kwargs["reason"] = reason
-        raise HTTPExceptionWithAuditLogging(
-            audit_kwargs=audit_kwargs, status_code=HTTPStatus.BAD_REQUEST, detail=reason
-        )
     except SQLAlchemyError as ex:
         reason = "INTERNAL_SERVER_ERROR: " + str(ex)
         logger.exception(reason)

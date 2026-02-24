@@ -27,7 +27,3 @@ class SemanticObjectRelationException(Exception):
             data_storage_objects.extend(semantic_objects.data_storages)
             message.extend(data_storage_objects)
         super().__init__("\n".join(message))
-
-
-class ViewDependentColumnChangeException(Exception):
-    """Raised when ALTER affects datastorage columns referenced by views."""

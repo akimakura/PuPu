@@ -145,9 +145,15 @@ class DataStorageRepository:
                 field.labels = converted_labels
         field.semantic_type = field_dict.get("semantic_type", field.semantic_type)
         field.sql_name = field_dict.get("sql_name", field.sql_name)
-        field.is_key = field_dict.get("is_key", field.is_key)
-        field.is_sharding_key = field_dict.get("is_sharding_key", field.is_sharding_key)
-        field.is_tech_field = field_dict.get("is_tech_field", field.is_tech_field)
+        is_key = field_dict.get("is_key")
+        if is_key is not None:
+            field.is_key = is_key
+        is_sharding_key = field_dict.get("is_sharding_key")
+        if is_sharding_key is not None:
+            field.is_sharding_key = is_sharding_key
+        is_tech_field = field_dict.get("is_tech_field")
+        if is_tech_field is not None:
+            field.is_tech_field = is_tech_field
         field.field_type = ref_type["ref_object_type"]
 
         field.dimension_id = None
