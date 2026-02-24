@@ -10,9 +10,12 @@ from py_common_lib.logger.audit_types import F9
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 
+from src.config import settings
+from src.db.composite import Composite
 from src.db.data_storage import DataStorage, DataStorageField
 from src.db.engine import DatabaseConnector
 from src.db.model import Model
+from src.models.composite import CompositeFieldRefObjectEnum
 from src.models.consts import DATA_TYPES
 from src.models.database import Database as DatabaseModel, DatabaseTypeEnum
 from src.models.database_object import DatabaseObject as DatabaseObjectModel, DbObjectTypeEnum
@@ -199,6 +202,39 @@ class GeneratorPostgreSQLRepository(GeneratorRepository):
         ]
 
     @classmethod
+    async def _find_all_dependent_views(
+        cls, database: DatabaseModel, schema_name: str, source_names: list[str]
+    ) -> list[dict[str, str]]:
+        """
+        Рекурсивно ищет все VIEW, зависящие от указанных объектов (таблиц или VIEW).
+        Возвращает список в порядке BFS — сначала прямые зависимости, затем транзитивные.
+        Для DROP нужен обратный порядок (reversed), для CREATE — прямой.
+
+        Args:
+            database (DatabaseModel): Модель подключения к БД.
+            schema_name (str): Имя схемы.
+            source_names (list[str]): Имена исходных объектов (таблиц или VIEW).
+
+        Returns:
+            list[dict[str, str]]: Список зависимых VIEW с ключами view_schema, view_name, view_definition.
+        """
+        visited: set[str] = set(source_names)
+        result: list[dict[str, str]] = []
+        current_names = list(source_names)
+
+        while current_names:
+            dependent_views = await cls.find_views_by_table(database, schema_name, current_names)
+            next_names: list[str] = []
+            for view in dependent_views:
+                if view["view_name"] not in visited:
+                    visited.add(view["view_name"])
+                    result.append(view)
+                    next_names.append(view["view_name"])
+            current_names = next_names
+
+        return result
+
+    @classmethod
     async def _is_possible_to_drop_column(
         cls,
         database_objects: list[DatabaseObjectModel],
@@ -364,12 +400,13 @@ class GeneratorPostgreSQLRepository(GeneratorRepository):
         schemas = {db_obj.schema_name for db_obj in database_objects if db_obj.schema_name}
         dependent_views: list[dict[str, str]] = []
         for schema in schemas:
-            dependent_views.extend(await cls.find_views_by_table(database, schema, table_names))
+            dependent_views.extend(await cls._find_all_dependent_views(database, schema, table_names))
 
         drop_views_sql: list[str] = []
         create_views_sql: list[str] = []
-        for view in dependent_views:
+        for view in reversed(dependent_views):
             drop_views_sql.append(f"DROP VIEW IF EXISTS {view['view_schema']}.{view['view_name']}")
+        for view in dependent_views:
             create_views_sql.append(
                 f"CREATE VIEW {view['view_schema']}.{view['view_name']} AS {view['view_definition']}"
             )
@@ -382,3 +419,58 @@ class GeneratorPostgreSQLRepository(GeneratorRepository):
                 )
 
         return drop_views_sql + alter_sql + create_views_sql
+
+    @classmethod
+    async def update_composite(cls, composite: Composite, model: Model, sql_expression: str) -> Optional[list[str]]:
+        """
+        Пересоздаёт VIEW для композита в PostgreSQL.
+        Перед DROP находит все зависимые VIEW (рекурсивно), удаляет их,
+        пересоздаёт целевой VIEW и восстанавливает зависимые.
+
+        Args:
+            composite (Composite): Объект композита.
+            model (Model): Модель с данными о базе данных.
+            sql_expression (str): SQL-выражение для создания представления.
+
+        Returns:
+            Optional[list[str]]: Сформированные SQL-запросы или None.
+        """
+        for datasource in composite.datasources:
+            if datasource.type == CompositeFieldRefObjectEnum.CE_SCENARIO:
+                return None
+        if not settings.ENABLE_GENERATE_OBJECTS:
+            return None
+        database = DatabaseModel.model_validate(model.database)
+        database_objects = get_filtred_database_object_by_data_storage(composite, model.name)
+        cluster_name = database.default_cluster_name
+        sql_expression_update = None
+        for database_object in database_objects:
+            if database_object.schema_name is None:
+                raise ValueError(f"database_object {database_object.name} does not contain schema_name.")
+
+            dependent_views = await cls._find_all_dependent_views(
+                database, database_object.schema_name, [database_object.name]
+            )
+
+            all_sql: list[str] = []
+            for view in reversed(dependent_views):
+                all_sql.append(f"DROP VIEW IF EXISTS {view['view_schema']}.{view['view_name']}")
+
+            sql_expression_update = cls._get_create_view_sql(
+                database_object.schema_name, database_object.name, sql_expression, cluster_name, replace=True
+            )
+            all_sql.extend(sql_expression_update)
+
+            for view in dependent_views:
+                all_sql.append(
+                    f"CREATE VIEW {view['view_schema']}.{view['view_name']} AS {view['view_definition']}"
+                )
+
+            logger.debug("SQL_EXPRESSION created. sql_expression='%s'", all_sql)
+            await cls._execute_DDL(all_sql, database)
+            logger.debug(
+                "View for composite with name=%s, schema_name=%s updated in database.",
+                database_object.name,
+                database_object.schema_name,
+            )
+        return sql_expression_update
