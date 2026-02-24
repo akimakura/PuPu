@@ -137,11 +137,15 @@ def _make_hierarchy_label(
 def _build_service(session: AsyncSession, dimension: Dimension | None = None) -> HierarchyPvdService:
     """Собирает HierarchyPvdService с реальным репозиторием и замоканным DimensionService."""
     hierarchy_repo = HierarchyRepository.get_by_session(session)
-    dimension_service = MagicMock()
-    if dimension is not None:
-        dimension_service.configure_mock(
-            get_dimension_orm_model=AsyncMock(return_value=dimension),
-        )
+    pv_dictionary_map = (
+        {dimension.name: dimension.pv_dictionary.object_name}
+        if dimension and dimension.pv_dictionary and dimension.pv_dictionary.object_name
+        else {}
+    )
+    dimension_service = MagicMock(
+        get_dimension_orm_model=AsyncMock(return_value=dimension),
+        get_pv_dictionary_object_names_by_dimension_names=AsyncMock(return_value=pv_dictionary_map),
+    )
     return HierarchyPvdService(
         hierarchy_repo=hierarchy_repo,
         dimension_service=dimension_service,

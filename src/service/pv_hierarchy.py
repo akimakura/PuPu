@@ -123,20 +123,20 @@ class HierarchyPvdService:
         несинхронизированного состояния ORM-коллекции base_dimensions в рамках одной сессии.
         """
         dimensions = await self.hierarchy_repo.get_base_dimension_names_by_hierarchy_id(hierarchy_orm.id)
+        dimension_names = [dim_name for dim_name, _ in dimensions]
+        dimension_to_object_name = await self.dimension_service.get_pv_dictionary_object_names_by_dimension_names(
+            tenant_id=tenant_id,
+            model_name=model_name,
+            names=dimension_names,
+        )
+
+        dictionary_name_set: set[str] = set()
         dictionary_name_list: list[str] = []
         for dim_name, _ in dimensions:
-            dimension = await self.dimension_service.get_dimension_orm_model(
-                tenant_id=tenant_id,
-                model_name=model_name,
-                name=dim_name,
-            )
-            if (
-                dimension
-                and dimension.pv_dictionary
-                and dimension.pv_dictionary.object_name
-                and dimension.pv_dictionary.object_name not in dictionary_name_list
-            ):
-                dictionary_name_list.append(dimension.pv_dictionary.object_name)
+            obj_name = dimension_to_object_name.get(dim_name)
+            if obj_name and obj_name not in dictionary_name_set:
+                dictionary_name_set.add(obj_name)
+                dictionary_name_list.append(obj_name)
         return dictionary_name_list
 
     async def _build_pvd_payload(

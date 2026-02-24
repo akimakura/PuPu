@@ -218,6 +218,44 @@ class DimensionRepository:
         result = (await self.session.execute(query)).unique().scalars().one_or_none()
         return result
 
+    @timeit
+    async def get_pv_dictionary_object_names_by_dimension_names(
+        self,
+        tenant_id: str,
+        model_name: str,
+        names: list[str],
+    ) -> dict[str, str]:
+        """
+        Возвращает соответствие имени измерения и object_name его PV Dictionary.
+
+        Метод выполняет один batch-запрос только по нужным полям и не загружает тяжелый ORM-граф Dimension.
+        """
+        if not names:
+            return {}
+
+        query = (
+            select(Dimension.name, PVDctionary.object_name)
+            .select_from(Dimension)
+            .join(
+                DimensionModelRelationOrm,
+                DimensionModelRelationOrm.dimension_id == Dimension.id,
+            )
+            .join(Model, Model.id == DimensionModelRelationOrm.model_id)
+            .join(PVDctionary, PVDctionary.id == Dimension.pv_dictionary_id)
+            .where(
+                Dimension.tenant_id == tenant_id,
+                Model.name == model_name,
+                Dimension.name.in_(names),
+            )
+        )
+        rows = (await self.session.execute(query)).all()
+
+        result: dict[str, str] = {}
+        for name, object_name in rows:
+            if name not in result:
+                result[name] = object_name
+        return result
+
     async def get_dimension_orm_model(self, tenant_id: str, name: str, model_name: Optional[str] = None) -> Any:
         """
         Получает объект измерения ORM по имени и (при наличии) имени модели.

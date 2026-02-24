@@ -189,6 +189,19 @@ class DimensionService:
         """
         return await self.data_repository.get_dimension_orm_model(tenant_id=tenant_id, model_name=model_name, name=name)
 
+    async def get_pv_dictionary_object_names_by_dimension_names(
+        self,
+        tenant_id: str,
+        model_name: str,
+        names: list[str],
+    ) -> dict[str, str]:
+        """Возвращает map: имя измерения -> object_name PV Dictionary."""
+        return await self.data_repository.get_pv_dictionary_object_names_by_dimension_names(
+            tenant_id=tenant_id,
+            model_name=model_name,
+            names=names,
+        )
+
     async def delete_dimension_in_pvd_by_pv_name(self, pv_name: str) -> None:
         """Удалить измерение из PVD."""
         if not settings.ENABLE_PV_DICTIONARIES:
