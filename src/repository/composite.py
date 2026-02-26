@@ -58,6 +58,7 @@ from src.repository.utils import (
     get_object_filtred_by_model_name,
     get_select_query_with_offset_limit_order,
 )
+from src.utils.schema_override import get_model_schema_override
 
 logger = EPMPYLogger(__name__)
 
@@ -83,6 +84,9 @@ class CompositeRepository:
     def get_database_objects_by_model(self, composite_name: str, model: Model) -> list[DatabaseObjectModel]:
         """Получить список databaseObject по имени Composite и модели."""
         model_model = ModelModel.model_validate(model)
+        schema_override = get_model_schema_override(model_model.tenant_id, model_model.name)
+        if schema_override:
+            model_model.schema_name = schema_override
         database_objects = [
             DatabaseObjectModel.model_validate(
                 {
@@ -996,6 +1000,38 @@ class CompositeRepository:
             regenerate_sql_expression = True
         return regenerate_sql_expression
 
+    @staticmethod
+    def _database_object_key(database_object: DatabaseObject | DatabaseObjectModel) -> tuple[str, str]:
+        """Строит ключ сопоставления dbObject по имени и типу."""
+        return database_object.name, str(database_object.type)
+
+    def _update_database_objects_schema_for_model(
+        self,
+        composite: Composite,
+        model_name: str,
+        database_objects: list[DatabaseObjectModel],
+    ) -> None:
+        """Обновляет schema_name у dbObjects только для целевой модели."""
+        database_objects_for_model = get_object_filtred_by_model_name(
+            composite.database_objects,
+            model_name,
+            True,
+        )
+        update_mapping = {
+            self._database_object_key(database_object): database_object
+            for database_object in database_objects
+            if database_object.schema_name
+        }
+        if not update_mapping:
+            return None
+
+        for database_object in database_objects_for_model:
+            update_object = update_mapping.get(self._database_object_key(database_object))
+            if update_object is None:
+                continue
+            database_object.schema_name = update_object.schema_name
+        return None
+
     @timeit
     async def update_by_name_and_schema(
         self,
@@ -1032,6 +1068,12 @@ class CompositeRepository:
             if model.name == model_name:
                 return_model = model
         composite_dict.pop("database_objects", [])
+        if composite.database_objects is not None:
+            self._update_database_objects_schema_for_model(
+                original_composite,
+                model_name,
+                composite.database_objects,
+            )
         model = await self.model_repository.get_model_orm_by_session_with_error(tenant_id=tenant_id, name=model_name)
         await self.create_additional_virtual_dimensions(model)
         database = DatabaseModel.model_validate(model.database)

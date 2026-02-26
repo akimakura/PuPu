@@ -19,7 +19,7 @@ from src.cache.decorator import cache
 from src.cache.types import CacheHeaderEnum
 from src.models.database_object import DatabaseObject as DatabaseObjectModel
 from src.models.meta_synchronizer import DetailMetaSynchronizerResponse, DetailsMetaSynchronizerResponse
-from src.models.model import FindDependentObjectsRequest, Model, ModelCreateRequest, ModelEditRequest
+from src.models.model import Model, ModelCreateRequest, ModelEditRequest
 from src.models.permissions import PermissionEnum
 from src.models.request_params import Pagination
 from src.models.tenant import SemanticObjectsTypeEnum
@@ -338,7 +338,7 @@ async def find_dependent_objects(
     model_name: str = Path(alias="modelName"),
     tenant_id: str = Path(alias="tenantName"),
     object_type: SemanticObjectsTypeEnum = Query(alias="objectType"),
-    payload: FindDependentObjectsRequest | None = Body(default=None),
+    payload: list[str] | None = Body(default=None),
 ) -> list[DatabaseObjectModel]:
     """Запустить сбор зависимых VIEW и вернуть список databaseObject."""
     audit_kwargs = {
@@ -346,13 +346,13 @@ async def find_dependent_objects(
         "status": StatusType.FAIL,
         "object_id": request.url.path,
         "object_name": DatabaseObjectModel.__qualname__,
-        "object_properties": [payload.model_dump(by_alias=True, mode="json", exclude_none=True)] if payload else [],
-        "message": payload.model_dump(by_alias=True, mode="json", exclude_none=True) if payload else {},
+        "object_properties": [payload] if payload else [],
+        "message": payload if payload else [],
     }
     try:
         if object_type != SemanticObjectsTypeEnum.DATA_STORAGE:
             raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail="Only DATA_STORAGE is supported.")
-        object_names = payload.object_names if payload else None
+        object_names = payload if payload else None
         collected_ids = await service.collect_views_for_model(tenant_id, model_name, object_names)
         if not collected_ids:
             audit_kwargs["audit_type"] = audit_types.C3

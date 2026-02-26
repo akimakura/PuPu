@@ -2,6 +2,7 @@
 Сервис интеграции с АОР.
 """
 
+import copy
 from typing import Any, Callable, Coroutine, Optional, Protocol
 from uuid import UUID
 
@@ -27,6 +28,11 @@ from src.service.hierarchy import HierarchyService
 from src.service.measure import MeasureService
 from src.service.model import ModelService
 from src.service.utils import get_diff_lst
+from src.utils.schema_override import (
+    apply_schema_override_to_database_objects,
+    apply_schema_override_to_model_payload,
+    get_model_schema_override,
+)
 
 logger = EPMPYLogger(__name__)
 
@@ -224,6 +230,46 @@ class AorService:
         obj.pop("pv_dictionary", None)
         obj.pop("pvDictionary", None)
 
+    def __get_models_with_schema_override(
+        self,
+        aor_type: AorType,
+        tenant_id: str,
+        model_names: list[str],
+    ) -> list[str]:
+        """Возвращает модели, для которых задан env-override схемы при деплое объекта."""
+        if aor_type not in {AorType.DATASTORAGE, AorType.COMPOSITE}:
+            return []
+        return [model_name for model_name in model_names if get_model_schema_override(tenant_id, model_name)]
+
+    def __apply_schema_override_to_payload(
+        self,
+        push_command: PushAorCommand,
+        model_name: Optional[str] = None,
+    ) -> bool:
+        """
+        Применяет override схемы к payload деплоя.
+
+        Для `MODEL` обновляет поле схемы модели, для `DATASTORAGE/COMPOSITE`
+        обновляет `schemaName/schema_name` в `dbObjects`.
+        """
+        payload = push_command.data_json.data_json
+        tenant_id = push_command.data_json.tenant
+        if push_command.type == AorType.MODEL:
+            return apply_schema_override_to_model_payload(payload, tenant_id)
+        if push_command.type not in {AorType.DATASTORAGE, AorType.COMPOSITE} or not model_name:
+            return False
+
+        schema_override = get_model_schema_override(tenant_id, model_name)
+        if not schema_override:
+            return False
+
+        database_objects = payload.get("dbObjects")
+        if database_objects is None:
+            database_objects = payload.get("database_objects")
+        if not isinstance(database_objects, list):
+            return False
+        return apply_schema_override_to_database_objects(database_objects, schema_override)
+
     async def __get_commands_not_linked_to_model(
         self, command: PushAorCommand
     ) -> list[tuple[CommandEnum, Optional[str]]]:
@@ -272,9 +318,10 @@ class AorService:
                 command.data_json.data_json["name"],
             )
             return [(CommandEnum.DELETE, None)]
+        command_payload = copy.deepcopy(command.data_json.data_json)
         self.__clear_uncomparable_fields(obj_dict)
-        self.__clear_uncomparable_fields(command.data_json.data_json)
-        if command.data_json.data_json != obj_dict:
+        self.__clear_uncomparable_fields(command_payload)
+        if command_payload != obj_dict:
             logger.info(
                 "Content updated for %s %s",
                 command.type,
@@ -328,7 +375,8 @@ class AorService:
         }
         if getters.get(command.type) is None:
             raise ValueError(f"Unknown type: {command.type}")
-        new_models = command.data_json.data_json.pop("models", [])
+        command_payload = copy.deepcopy(command.data_json.data_json)
+        new_models = command_payload.pop("models", [])
         if not new_models:
             raise ValueError("Deploy object MEASURE, DIMENSION, DATASTORAGE or Composite must have models")
         if isinstance(new_models[0], dict):
@@ -339,6 +387,11 @@ class AorService:
             if new_model_obj:
                 _filtred_models.append(new_model)
         new_models = _filtred_models
+        models_with_schema_override = self.__get_models_with_schema_override(
+            command.type,
+            command.data_json.tenant,
+            new_models,
+        )
         if not new_models:
             raise ValueError("Deploy object MEASURE, DIMENSION, DATASTORAGE or Composite must have models")
         linked_to_model_object = await getters[command.type](
@@ -372,6 +425,8 @@ class AorService:
                             model,
                         )
                     )
+            for model in models_with_schema_override:
+                result.append((CommandEnum.UPDATE, model))
             return result
         obj_dict = linked_to_model_object.model_dump(by_alias=True, mode="json")
         original_models = obj_dict.pop("models", [])
@@ -380,7 +435,7 @@ class AorService:
         if isinstance(original_models[0], dict):
             original_models = [model["name"] for model in original_models]
         self.__clear_uncomparable_fields(obj_dict)
-        self.__clear_uncomparable_fields(command.data_json.data_json)
+        self.__clear_uncomparable_fields(command_payload)
         deleted_models = get_diff_lst(original_models, new_models)
         created_models = get_diff_lst(new_models, original_models)
         if command.data_json.is_deleted:
@@ -412,7 +467,7 @@ class AorService:
                 deleted_models,
             )
             result.extend([(CommandEnum.DELETE, model) for model in deleted_models])
-        if command.data_json.data_json != obj_dict:
+        if command_payload != obj_dict:
             logger.info(
                 "Content updated for %s %s",
                 command.type,
@@ -425,6 +480,10 @@ class AorService:
                 command.type,
                 command.data_json.data_json["name"],
             )
+        for model in models_with_schema_override:
+            if (CommandEnum.DELETE, model) in result or (CommandEnum.UPDATE, model) in result:
+                continue
+            result.append((CommandEnum.UPDATE, model))
         return result
 
     async def __get_commands_by_push_command(self, command: PushAorCommand) -> list[tuple[CommandEnum, Optional[str]]]:
@@ -476,6 +535,7 @@ class AorService:
                 push_command.data_json.tenant,
                 push_command.data_json.data_json["name"],
             )
+            self.__apply_schema_override_to_payload(push_command)
             CreatePydanticModel = pydantic_model_mappings[push_command.type][0]
             instance_create_pydantic_model: Any = CreatePydanticModel.model_validate(push_command.data_json.data_json)
             create_method = updaters[push_command.type][0]
@@ -491,6 +551,7 @@ class AorService:
                 push_command.data_json.tenant,
                 push_command.data_json.data_json["name"],
             )
+            self.__apply_schema_override_to_payload(push_command)
             UpdatePydanticModel = pydantic_model_mappings[push_command.type][1]
             instance_update_pydantic_model: Any = UpdatePydanticModel.model_validate(push_command.data_json.data_json)
             update_method = updaters[push_command.type][2]
@@ -594,6 +655,7 @@ class AorService:
                 command[1],
                 push_command.data_json.data_json["name"],
             )
+            self.__apply_schema_override_to_payload(push_command, command[1])
             CreatePydanticModel = pydantic_model_mappings[push_command.type][0]
             instance_create_pydantic_model: Any = CreatePydanticModel.model_validate(push_command.data_json.data_json)
             create_method = updaters[push_command.type][0]
@@ -649,6 +711,7 @@ class AorService:
                 command[1],
                 push_command.data_json.data_json["name"],
             )
+            self.__apply_schema_override_to_payload(push_command, command[1])
             UpdatePydanticModel = pydantic_model_mappings[push_command.type][1]
             instance_update_pydantic_model: Any = UpdatePydanticModel.model_validate(push_command.data_json.data_json)
             update_method = updaters[push_command.type][2]
@@ -767,6 +830,7 @@ class AorService:
             push_command.version,
         )
         self.pop_not_processed_fields(push_command.data_json.data_json)
+        self.__apply_schema_override_to_payload(push_command)
         commands = await self.__get_commands_by_push_command(push_command)
         for command in commands:
             if push_command.type in {AorType.DATABASE, AorType.MODEL}:
