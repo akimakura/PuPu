@@ -309,7 +309,7 @@ class AorService:
             )
             return [(CommandEnum.CREATE, None)]
 
-        obj_dict = not_linked_to_model_object.model_dump(by_alias=True, mode="json")
+        obj_dict = self.__build_comparable_payload(not_linked_to_model_object.model_dump(by_alias=True, mode="json"))
 
         if command.data_json.is_deleted:
             logger.info(
@@ -318,9 +318,7 @@ class AorService:
                 command.data_json.data_json["name"],
             )
             return [(CommandEnum.DELETE, None)]
-        command_payload = copy.deepcopy(command.data_json.data_json)
-        self.__clear_uncomparable_fields(obj_dict)
-        self.__clear_uncomparable_fields(command_payload)
+        command_payload = self.__build_comparable_payload(command.data_json.data_json)
         if command_payload != obj_dict:
             logger.info(
                 "Content updated for %s %s",
@@ -345,6 +343,27 @@ class AorService:
         if "fields" in obj_dict:
             for field in obj_dict["fields"]:
                 field.pop("sqlColumnType", None)
+
+    def __build_comparable_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Возвращает копию payload, очищенную от несравниваемых полей."""
+        comparable_payload = copy.deepcopy(payload)
+        self.__clear_uncomparable_fields(comparable_payload)
+        return comparable_payload
+
+    def __append_schema_override_update_commands(
+        self,
+        result: list[tuple[CommandEnum, Optional[str]]],
+        models_with_schema_override: list[str],
+        skip_models: Optional[set[str]] = None,
+    ) -> None:
+        """Добавляет UPDATE-команды для моделей с override схемы, если команды ещё не запланированы."""
+        skip_models = skip_models or set()
+        for model in models_with_schema_override:
+            if model in skip_models:
+                continue
+            if (CommandEnum.DELETE, model) in result or (CommandEnum.UPDATE, model) in result:
+                continue
+            result.append((CommandEnum.UPDATE, model))
 
     async def __get_commands_linked_to_model(self, command: PushAorCommand) -> list[tuple[CommandEnum, Optional[str]]]:
         """
@@ -425,8 +444,11 @@ class AorService:
                             model,
                         )
                     )
-            for model in models_with_schema_override:
-                result.append((CommandEnum.UPDATE, model))
+            self.__append_schema_override_update_commands(
+                result,
+                models_with_schema_override,
+                skip_models={new_models[0]},
+            )
             return result
         obj_dict = linked_to_model_object.model_dump(by_alias=True, mode="json")
         original_models = obj_dict.pop("models", [])
@@ -434,8 +456,8 @@ class AorService:
             raise ValueError("Prev object MEASURE, DIMENSION, HIERARCHY, DATASTORAGE or Composite must have models")
         if isinstance(original_models[0], dict):
             original_models = [model["name"] for model in original_models]
-        self.__clear_uncomparable_fields(obj_dict)
-        self.__clear_uncomparable_fields(command_payload)
+        obj_dict = self.__build_comparable_payload(obj_dict)
+        command_payload = self.__build_comparable_payload(command_payload)
         deleted_models = get_diff_lst(original_models, new_models)
         created_models = get_diff_lst(new_models, original_models)
         if command.data_json.is_deleted:
@@ -480,10 +502,7 @@ class AorService:
                 command.type,
                 command.data_json.data_json["name"],
             )
-        for model in models_with_schema_override:
-            if (CommandEnum.DELETE, model) in result or (CommandEnum.UPDATE, model) in result:
-                continue
-            result.append((CommandEnum.UPDATE, model))
+        self.__append_schema_override_update_commands(result, models_with_schema_override)
         return result
 
     async def __get_commands_by_push_command(self, command: PushAorCommand) -> list[tuple[CommandEnum, Optional[str]]]:

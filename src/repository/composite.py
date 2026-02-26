@@ -57,6 +57,7 @@ from src.repository.utils import (
     get_database_schema_database_object_mapping,
     get_object_filtred_by_model_name,
     get_select_query_with_offset_limit_order,
+    update_database_objects_schema_for_model,
 )
 from src.utils.schema_override import get_model_schema_override
 
@@ -1000,38 +1001,6 @@ class CompositeRepository:
             regenerate_sql_expression = True
         return regenerate_sql_expression
 
-    @staticmethod
-    def _database_object_key(database_object: DatabaseObject | DatabaseObjectModel) -> tuple[str, str]:
-        """Строит ключ сопоставления dbObject по имени и типу."""
-        return database_object.name, str(database_object.type)
-
-    def _update_database_objects_schema_for_model(
-        self,
-        composite: Composite,
-        model_name: str,
-        database_objects: list[DatabaseObjectModel],
-    ) -> None:
-        """Обновляет schema_name у dbObjects только для целевой модели."""
-        database_objects_for_model = get_object_filtred_by_model_name(
-            composite.database_objects,
-            model_name,
-            True,
-        )
-        update_mapping = {
-            self._database_object_key(database_object): database_object
-            for database_object in database_objects
-            if database_object.schema_name
-        }
-        if not update_mapping:
-            return None
-
-        for database_object in database_objects_for_model:
-            update_object = update_mapping.get(self._database_object_key(database_object))
-            if update_object is None:
-                continue
-            database_object.schema_name = update_object.schema_name
-        return None
-
     @timeit
     async def update_by_name_and_schema(
         self,
@@ -1069,8 +1038,8 @@ class CompositeRepository:
                 return_model = model
         composite_dict.pop("database_objects", [])
         if composite.database_objects is not None:
-            self._update_database_objects_schema_for_model(
-                original_composite,
+            update_database_objects_schema_for_model(
+                original_composite.database_objects,
                 model_name,
                 composite.database_objects,
             )

@@ -26,6 +26,18 @@ def test_get_model_schema_override_optional(monkeypatch) -> None:
     assert get_model_schema_override("tenant1", "unknown") is None
 
 
+def test_get_model_schema_override_prefers_settings_then_env(monkeypatch) -> None:
+    key = "MODEL_TENANT1_ROR_DEV_LT_SCHEMA_NAME"
+    monkeypatch.setattr(settings, "ENABLE_SWITCH_MODEL_SCHEMA", True)
+    monkeypatch.setenv(key, "from_env")
+    monkeypatch.setattr(settings, key, " from_settings ", raising=False)
+
+    assert get_model_schema_override("tenant1", "ror_dev_lt") == "from_settings"
+
+    monkeypatch.setattr(settings, key, "   ", raising=False)
+    assert get_model_schema_override("tenant1", "ror_dev_lt") == "from_env"
+
+
 def test_apply_schema_override_to_model_payload(monkeypatch) -> None:
     monkeypatch.setattr(settings, "ENABLE_SWITCH_MODEL_SCHEMA", True)
     monkeypatch.setenv("MODEL_TENANT1_ROR_DEV_LT_SCHEMA_NAME", "new_schema")

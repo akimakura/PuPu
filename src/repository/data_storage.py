@@ -59,6 +59,7 @@ from src.repository.utils import (
     get_list_dimension_orm_by_session,
     get_object_filtred_by_model_name,
     get_select_query_with_offset_limit_order,
+    update_database_objects_schema_for_model,
 )
 from src.utils.schema_override import get_model_schema_override
 
@@ -1435,38 +1436,6 @@ class DataStorageRepository:
             .values({"is_owner": True})
         )
 
-    @staticmethod
-    def _database_object_key(database_object: DatabaseObject | DatabaseObjectModel) -> tuple[str, str]:
-        """Строит ключ сопоставления dbObject по имени и типу."""
-        return database_object.name, str(database_object.type)
-
-    def _update_database_objects_schema_for_model(
-        self,
-        data_storage: DataStorageOrm,
-        model_name: str,
-        database_objects: list[DatabaseObjectModel],
-    ) -> None:
-        """Обновляет schema_name у dbObjects только для целевой модели."""
-        database_objects_for_model = get_object_filtred_by_model_name(
-            data_storage.database_objects,
-            model_name,
-            True,
-        )
-        update_mapping = {
-            self._database_object_key(database_object): database_object
-            for database_object in database_objects
-            if database_object.schema_name
-        }
-        if not update_mapping:
-            return None
-
-        for database_object in database_objects_for_model:
-            update_object = update_mapping.get(self._database_object_key(database_object))
-            if update_object is None:
-                continue
-            database_object.schema_name = update_object.schema_name
-        return None
-
     async def update_datastorage_orm(
         self,
         tenant_id: str,
@@ -1502,8 +1471,8 @@ class DataStorageRepository:
         data_storage_dict.pop("table", {})
         data_storage_dict.pop("database_objects", [])
         if data_storage.database_objects is not None:
-            self._update_database_objects_schema_for_model(
-                original_data_storage,
+            update_database_objects_schema_for_model(
+                original_data_storage.database_objects,
                 model_name,
                 data_storage.database_objects,
             )

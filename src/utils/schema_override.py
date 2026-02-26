@@ -27,6 +27,22 @@ def _build_legacy_model_schema_env_key(tenant_id: str, model_name: str) -> str:
     return f"DB_{tenant_token}_{model_token}_SCHEMA"
 
 
+def _normalize_env_value(value: Any) -> str | None:
+    """Нормализует значение env-параметра и отбрасывает пустые значения."""
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    return normalized or None
+
+
+def _read_env_schema_value(env_key: str) -> str | None:
+    """Возвращает значение env-параметра из `settings` или системного окружения."""
+    settings_value = _normalize_env_value(getattr(settings, env_key, None))
+    if settings_value is not None:
+        return settings_value
+    return _normalize_env_value(os.getenv(env_key))
+
+
 def get_model_schema_override(tenant_id: str | None, model_name: str | None) -> str | None:
     """
     Возвращает переопределённую схему модели из переменных окружения.
@@ -38,15 +54,14 @@ def get_model_schema_override(tenant_id: str | None, model_name: str | None) -> 
         return None
 
     env_key = build_model_schema_env_key(tenant_id, model_name)
-    value = getattr(settings, env_key, None) or os.getenv(env_key)
-    if value:
-        return value.strip() or None
+    value = _read_env_schema_value(env_key)
+    if value is not None:
+        return value
 
-    # Keep backward compatibility with legacy variable naming.
     legacy_key = _build_legacy_model_schema_env_key(tenant_id, model_name)
-    legacy_value = getattr(settings, legacy_key, None) or os.getenv(legacy_key)
-    if legacy_value:
-        return legacy_value.strip() or None
+    legacy_value = _read_env_schema_value(legacy_key)
+    if legacy_value is not None:
+        return legacy_value
 
     return None
 
