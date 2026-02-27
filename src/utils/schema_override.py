@@ -104,9 +104,10 @@ def apply_schema_override_to_database_objects(database_objects: list[Any], schem
                 changed = True
             continue
 
-        current = getattr(db_object, "schema_name", None)
-        if current != schema_name:
-            setattr(db_object, "schema_name", schema_name)
+        if not hasattr(db_object, "schema_name"):
+            continue
+        if db_object.schema_name != schema_name:
+            db_object.schema_name = schema_name
             changed = True
 
     return changed

@@ -61,7 +61,6 @@ from src.repository.utils import (
     get_select_query_with_offset_limit_order,
     update_database_objects_schema_for_model,
 )
-from src.utils.schema_override import get_model_schema_override
 
 DATA_STORAGE_LOG_TABLE_LEGTH = {
     DataStorageLogsFieldEnum.TIMESTAMP: 50,
@@ -298,9 +297,6 @@ class DataStorageRepository:
         database_objects = []
         database_model = DatabaseModel.model_validate(model.database)
         model_model = ModelModel.model_validate(model)
-        schema_override = get_model_schema_override(model_model.tenant_id, model_model.name)
-        if schema_override:
-            model_model.schema_name = schema_override
         db_model_type = database_model.type
 
         if db_model_type in [DatabaseTypeEnum.GREENPLUM, DatabaseTypeEnum.POSTGRESQL]:

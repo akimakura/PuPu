@@ -2,14 +2,12 @@ from enum import StrEnum
 from typing import Any, Optional
 from uuid import UUID, uuid4
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
-from pydantic_core import core_schema
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
-from src.config import models_limitations, settings
+from src.config import models_limitations
 from src.integration.aor.model import AorType
 from src.models.database import Database
 from src.models.label import Label
-from src.utils.schema_override import get_model_schema_override
 from src.models.version import Versioned
 
 
@@ -82,24 +80,6 @@ class Model(Versioned):
         if hasattr(model_obj, "database"):
             model_obj.database_name = model_obj.database.name
         return model_obj
-
-    @field_validator("schema_name")
-    @classmethod
-    def switch_schema_name(cls, schema_name: str, all_fields: core_schema.ValidationInfo, **kwargs: dict) -> str:
-        """
-        Подменяет имя схемы из .env файла, если включена опция ENABLE_SWITCH_MODEL_SCHEMA.
-        Ищет в .env файле переменные "MODEL_{tenant}_{name}_SCHEMA_NAME".
-        Для обратной совместимости также поддерживается старый формат "DB_{tenant}_{name}_SCHEMA".
-        """
-        if not settings.ENABLE_SWITCH_MODEL_SCHEMA or not all_fields.data.get("tenant_id"):
-            return schema_name
-        tenant = all_fields.data.get("tenant_id")
-        name = all_fields.data.get("name")
-        new_schema_name = get_model_schema_override(tenant, name)
-        if new_schema_name:
-            return new_schema_name
-        return schema_name
-
 
 class ModelEditRequest(BaseModel):
     """
@@ -227,4 +207,3 @@ class ModelStatus(BaseModel):
         min_length=models_limitations["model_status"]["msg"]["min_length"],
         default=None,
     )
-

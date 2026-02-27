@@ -210,7 +210,7 @@ def convert_anyfield_dict_to_orm(
     any_field: dict,
 ) -> AnyField:
     """Конвертирует AnyField из словаря в модель SQLalchemy AnyField"""
-    any_field["labels"] = convert_labels_list_to_orm(any_field.pop("labels"), AnyFieldLabel)
+    any_field["labels"] = convert_labels_list_to_orm(any_field.pop("labels", []), AnyFieldLabel)
     return AnyField(**any_field)
 
 
@@ -234,8 +234,14 @@ async def convert_ref_type_to_orm(
         )
         return ref_object
     if field_type == BaseFieldTypeEnum.ANYFIELD:
-        add_missing_labels(ref_type["ref_object"]["labels"], ref_type["ref_object"]["name"], append_long=False)
-        return convert_anyfield_dict_to_orm(ref_type["ref_object"])
+        ref_object = ref_type.get("ref_object")
+        if not isinstance(ref_object, dict):
+            raise ValueError("ref_object for ANYFIELD must be object")
+        if "name" not in ref_object:
+            raise ValueError("ref_object for ANYFIELD must contain name")
+        ref_object.setdefault("labels", [])
+        add_missing_labels(ref_object["labels"], ref_object["name"], append_long=False)
+        return convert_anyfield_dict_to_orm(ref_object)
     raise ValueError(f"Unknown type: {field_type}")
 
 

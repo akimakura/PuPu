@@ -59,7 +59,6 @@ from src.repository.utils import (
     get_select_query_with_offset_limit_order,
     update_database_objects_schema_for_model,
 )
-from src.utils.schema_override import get_model_schema_override
 
 logger = EPMPYLogger(__name__)
 
@@ -85,9 +84,6 @@ class CompositeRepository:
     def get_database_objects_by_model(self, composite_name: str, model: Model) -> list[DatabaseObjectModel]:
         """Получить список databaseObject по имени Composite и модели."""
         model_model = ModelModel.model_validate(model)
-        schema_override = get_model_schema_override(model_model.tenant_id, model_model.name)
-        if schema_override:
-            model_model.schema_name = schema_override
         database_objects = [
             DatabaseObjectModel.model_validate(
                 {
