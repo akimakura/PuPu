@@ -2,9 +2,10 @@ from enum import StrEnum
 from typing import Any, Optional
 from uuid import UUID, uuid4
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic_core import core_schema
 
-from src.config import models_limitations
+from src.config import models_limitations, settings
 from src.integration.aor.model import AorType
 from src.models.database import Database
 from src.models.label import Label
@@ -80,6 +81,23 @@ class Model(Versioned):
         if hasattr(model_obj, "database"):
             model_obj.database_name = model_obj.database.name
         return model_obj
+
+    @field_validator("schema_name")
+    @classmethod
+    def switch_schema_name(cls, schema_name: str, all_fields: core_schema.ValidationInfo, **kwargs: dict) -> str:
+        """
+        Подменяет имя схемы из .env файла, если включена опция ENABLE_SWITCH_HOST.
+        Ищет в .env файле переменные "DB_{tenant}_{name}_SCHEMA" и заменяет соответствующие значения модели.
+        """
+        if not settings.ENABLE_SWITCH_HOST or not all_fields.data.get("tenant_id"):
+            return schema_name
+        tenant = all_fields.data.get("tenant_id")
+        name = all_fields.data.get("name")
+        schema_name_env = f"DB_{tenant}_{name}_SCHEMA".upper()
+        new_schema_name = getattr(settings, schema_name_env, None)
+        if new_schema_name:
+            return new_schema_name
+        return schema_name
 
 class ModelEditRequest(BaseModel):
     """
