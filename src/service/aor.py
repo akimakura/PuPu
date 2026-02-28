@@ -238,8 +238,20 @@ class AorService:
     ) -> list[str]:
         """Возвращает модели, для которых задан env-override схемы при деплое объекта."""
         if aor_type not in {AorType.DATASTORAGE, AorType.COMPOSITE}:
+            print(
+                "[AOR_SCHEMA_OVERRIDE_DEBUG] "
+                f"skip models_with_override for type={aor_type} tenant={tenant_id} models={model_names}"
+            )
             return []
-        return [model_name for model_name in model_names if get_model_schema_override(tenant_id, model_name)]
+        models_with_override = [
+            model_name for model_name in model_names if get_model_schema_override(tenant_id, model_name)
+        ]
+        print(
+            "[AOR_SCHEMA_OVERRIDE_DEBUG] "
+            f"models_with_override type={aor_type} tenant={tenant_id} "
+            f"models={model_names} matched={models_with_override}"
+        )
+        return models_with_override
 
     def __apply_schema_override_to_payload(
         self,
@@ -254,21 +266,58 @@ class AorService:
         """
         payload = push_command.data_json.data_json
         tenant_id = push_command.data_json.tenant
+        print(
+            "[AOR_SCHEMA_OVERRIDE_DEBUG] apply_override_start "
+            f"type={push_command.type} tenant={tenant_id} model_name={model_name} "
+            f"payload_name={payload.get('name')} payload_models={payload.get('models')}"
+        )
         if push_command.type == AorType.MODEL:
-            return apply_schema_override_to_model_payload(payload, tenant_id)
+            result = apply_schema_override_to_model_payload(payload, tenant_id)
+            print(
+                "[AOR_SCHEMA_OVERRIDE_DEBUG] apply_override_model "
+                f"result={result} schemaName={payload.get('schemaName')} schema_name={payload.get('schema_name')}"
+            )
+            return result
         if push_command.type not in {AorType.DATASTORAGE, AorType.COMPOSITE} or not model_name:
+            print(
+                "[AOR_SCHEMA_OVERRIDE_DEBUG] "
+                f"apply_override_skip type={push_command.type} model_name={model_name}"
+            )
             return False
 
         schema_override = get_model_schema_override(tenant_id, model_name)
         if not schema_override:
+            print(
+                "[AOR_SCHEMA_OVERRIDE_DEBUG] "
+                f"apply_override_no_schema type={push_command.type} tenant={tenant_id} model={model_name}"
+            )
             return False
 
         database_objects = payload.get("dbObjects")
         if database_objects is None:
             database_objects = payload.get("database_objects")
         if not isinstance(database_objects, list):
+            print(
+                "[AOR_SCHEMA_OVERRIDE_DEBUG] "
+                f"apply_override_no_dbobjects type={push_command.type} model={model_name}"
+            )
             return False
-        return apply_schema_override_to_database_objects(database_objects, schema_override)
+        before_schemas = [
+            obj.get("schemaName") if isinstance(obj, dict) else getattr(obj, "schema_name", None)
+            for obj in database_objects
+        ]
+        result = apply_schema_override_to_database_objects(database_objects, schema_override)
+        after_schemas = [
+            obj.get("schemaName") if isinstance(obj, dict) else getattr(obj, "schema_name", None)
+            for obj in database_objects
+        ]
+        print(
+            "[AOR_SCHEMA_OVERRIDE_DEBUG] apply_override_dbobjects "
+            f"type={push_command.type} tenant={tenant_id} model={model_name} "
+            f"target_schema={schema_override} result={result} "
+            f"before={before_schemas} after={after_schemas}"
+        )
+        return result
 
     async def __get_commands_not_linked_to_model(
         self, command: PushAorCommand
@@ -406,6 +455,10 @@ class AorService:
             if new_model_obj:
                 _filtred_models.append(new_model)
         new_models = _filtred_models
+        print(
+            "[AOR_SCHEMA_OVERRIDE_DEBUG] "
+            f"linked_object_models type={command.type} tenant={command.data_json.tenant} models_after_filter={new_models}"
+        )
         models_with_schema_override = self.__get_models_with_schema_override(
             command.type,
             command.data_json.tenant,

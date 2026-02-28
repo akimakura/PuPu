@@ -139,6 +139,7 @@ class Settings(BaseSettings):
     ENABLE_GENERATE_OBJECTS: bool = False
     ENABLE_COLLECT_VIEW_FOR_DS: bool = True
     ENABLE_SWITCH_MODEL_SCHEMA: bool = True
+    ENABLE_LEGACY_MODEL_SCHEMA_OVERRIDE: bool = True
     DATAGATE_USER: str = "jwt"
     DATAGATE_PASSWORD: str = ""
     # Включить помену хостов на хосты из .env

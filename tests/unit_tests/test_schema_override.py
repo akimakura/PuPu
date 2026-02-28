@@ -26,6 +26,33 @@ def test_get_model_schema_override_optional(monkeypatch) -> None:
     assert get_model_schema_override("tenant1", "unknown") is None
 
 
+def test_get_model_schema_override_from_legacy_with_host_switch(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "ENABLE_SWITCH_MODEL_SCHEMA", False)
+    monkeypatch.setattr(settings, "ENABLE_SWITCH_HOST", True)
+    monkeypatch.setenv("DB_TENANT1_ROR_DEV_LT_SCHEMA", "legacy_schema")
+
+    assert get_model_schema_override("tenant1", "ror_dev_lt") == "legacy_schema"
+
+
+def test_get_model_schema_override_disabled(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "ENABLE_SWITCH_MODEL_SCHEMA", False)
+    monkeypatch.setattr(settings, "ENABLE_SWITCH_HOST", False)
+    monkeypatch.setattr(settings, "ENABLE_LEGACY_MODEL_SCHEMA_OVERRIDE", False, raising=False)
+    monkeypatch.setenv("MODEL_TENANT1_ROR_DEV_LT_SCHEMA_NAME", "new_schema")
+    monkeypatch.setenv("DB_TENANT1_ROR_DEV_LT_SCHEMA", "legacy_schema")
+
+    assert get_model_schema_override("tenant1", "ror_dev_lt") is None
+
+
+def test_get_model_schema_override_from_legacy_flag(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "ENABLE_SWITCH_MODEL_SCHEMA", False)
+    monkeypatch.setattr(settings, "ENABLE_SWITCH_HOST", False)
+    monkeypatch.setattr(settings, "ENABLE_LEGACY_MODEL_SCHEMA_OVERRIDE", True, raising=False)
+    monkeypatch.setenv("DB_TENANT1_ROR_DEV_LT_SCHEMA", "legacy_schema")
+
+    assert get_model_schema_override("tenant1", "ror_dev_lt") == "legacy_schema"
+
+
 def test_get_model_schema_override_prefers_settings_then_env(monkeypatch) -> None:
     key = "MODEL_TENANT1_ROR_DEV_LT_SCHEMA_NAME"
     monkeypatch.setattr(settings, "ENABLE_SWITCH_MODEL_SCHEMA", True)
