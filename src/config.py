@@ -388,3 +388,17 @@ settings = Settings()
 try_hide_write_api(settings)
 
 models_limitations = read_static_file_as_dict(os.path.join(settings.PATH_TO_STATIC, "models_limitations.json"))
+
+print(
+    "[ENV_DEBUG] "
+    f"cwd={os.getcwd()} ENV_FILE={ENV_FILE} env_file_exists={os.path.exists(ENV_FILE)}"
+)
+for env_key in (
+    "ENABLE_SWITCH_MODEL_SCHEMA",
+    "ENABLE_SWITCH_HOST",
+    "ENABLE_LEGACY_MODEL_SCHEMA_OVERRIDE",
+):
+    print(
+        "[ENV_DEBUG] "
+        f"{env_key} settings={getattr(settings, env_key, None)} os={os.getenv(env_key)}"
+    )
