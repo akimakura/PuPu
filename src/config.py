@@ -402,3 +402,26 @@ for env_key in (
         "[ENV_DEBUG] "
         f"{env_key} settings={getattr(settings, env_key, None)} os={os.getenv(env_key)}"
     )
+
+try:
+    from dotenv import dotenv_values
+
+    dotenv_map = dotenv_values(ENV_FILE)
+    schema_override_keys = sorted(
+        key
+        for key in dotenv_map
+        if key
+        and (
+            (key.startswith("MODEL_") and key.endswith("_SCHEMA_NAME"))
+            or (key.startswith("DB_") and key.endswith("_SCHEMA"))
+        )
+    )
+    print(f"[ENV_DEBUG] schema_override_keys_from_dotenv={schema_override_keys}")
+    for env_key in schema_override_keys:
+        print(
+            "[ENV_DEBUG] "
+            f"{env_key} dotenv={dotenv_map.get(env_key)} "
+            f"settings={getattr(settings, env_key, None)} os={os.getenv(env_key)}"
+        )
+except Exception as ex:
+    print(f"[ENV_DEBUG] dotenv parse error: {ex}")
