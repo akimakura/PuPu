@@ -266,6 +266,18 @@ class AorService:
         """
         payload = push_command.data_json.data_json
         tenant_id = push_command.data_json.tenant
+        if push_command.type in {AorType.DATASTORAGE, AorType.COMPOSITE} and not model_name:
+            payload_models = payload.get("models")
+            if isinstance(payload_models, list) and payload_models:
+                first_model = payload_models[0]
+                if isinstance(first_model, dict):
+                    model_name = first_model.get("name")
+                elif isinstance(first_model, str):
+                    model_name = first_model
+            print(
+                "[AOR_SCHEMA_OVERRIDE_DEBUG] "
+                f"apply_override_resolved_model_name_from_payload={model_name} raw_models={payload_models}"
+            )
         print(
             "[AOR_SCHEMA_OVERRIDE_DEBUG] apply_override_start "
             f"type={push_command.type} tenant={tenant_id} model_name={model_name} "
