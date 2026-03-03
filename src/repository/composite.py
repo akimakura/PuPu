@@ -767,7 +767,12 @@ class CompositeRepository:
         await self.create_additional_virtual_dimensions(model)
 
         model_model = ModelModel.model_validate(model)
+        expected_schema = model_model.schema_name
         database = DatabaseModel.model_validate(model.database)
+        if composite.database_objects:
+            for db_object in composite.database_objects:
+                if db_object.schema_name != expected_schema:
+                    db_object.schema_name = expected_schema
         if composite_dict["link_type"] in (CompositeLinkTypeEnum.SELECT, CompositeLinkTypeEnum.UNION):
             link_fields_list = []
 
@@ -806,7 +811,8 @@ class CompositeRepository:
         # Создаем database_objects для композита
         composite_dict.pop("database_objects", [])
         if datasources_info_dict[next(iter(datasources_info_dict))]["type"] != CompositeFieldRefObjectEnum.CE_SCENARIO:
-            composite.database_objects = self.get_database_objects_by_model(composite.name, model)
+            if not composite.database_objects:
+                composite.database_objects = self.get_database_objects_by_model(composite.name, model)
         else:
             composite.database_objects = []
 
@@ -1033,13 +1039,26 @@ class CompositeRepository:
             if model.name == model_name:
                 return_model = model
         composite_dict.pop("database_objects", [])
+        model = await self.model_repository.get_model_orm_by_session_with_error(tenant_id=tenant_id, name=model_name)
+        expected_schema = ModelModel.model_validate(model).schema_name
         if composite.database_objects is not None:
+            for db_object in composite.database_objects:
+                if db_object.schema_name != expected_schema:
+                    db_object.schema_name = expected_schema
             update_database_objects_schema_for_model(
                 original_composite.database_objects,
                 model_name,
                 composite.database_objects,
             )
-        model = await self.model_repository.get_model_orm_by_session_with_error(tenant_id=tenant_id, name=model_name)
+        else:
+            database_objects = get_object_filtred_by_model_name(
+                original_composite.database_objects,
+                model_name,
+                True,
+            )
+            for db_object in database_objects:
+                if db_object.schema_name != expected_schema:
+                    db_object.schema_name = expected_schema
         await self.create_additional_virtual_dimensions(model)
         database = DatabaseModel.model_validate(model.database)
         datasources = composite_dict.get(

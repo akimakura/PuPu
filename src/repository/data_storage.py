@@ -1158,6 +1158,8 @@ class DataStorageRepository:
             DataStorageOrm: Созданный объект хранилища данных ORM.
         """
         model = await self.model_repository.get_model_orm_by_session_with_error(tenant_id, model_name)
+        model_model = ModelModel.model_validate(model)
+        expected_schema = model_model.schema_name
         data_storage_dict = data_storage.model_dump(mode="json")
         data_storage_dict.pop("log_data_storage_name", None)
         data_storage_dict["tenant_id"] = tenant_id
@@ -1172,6 +1174,10 @@ class DataStorageRepository:
         await self.create_virtual_dimensions_for_log_data_storage([model])
         database_objects = data_storage_dict.pop("database_objects", [])
         data_storage_dict.pop("table", None)
+        if data_storage.database_objects:
+            for db_object in data_storage.database_objects:
+                if db_object.schema_name != expected_schema:
+                    db_object.schema_name = expected_schema
         if not database_objects:
             data_storage.database_objects = self.get_database_objects_by_models(
                 data_storage.name, data_storage.type, model
@@ -1463,15 +1469,29 @@ class DataStorageRepository:
         model = next(filter(lambda m: m.name == model_name, original_data_storage.models), None)
         if not model:
             raise ValueError("Model is None")
+        model_model = ModelModel.model_validate(model)
+        expected_schema = model_model.schema_name
 
         data_storage_dict.pop("table", {})
         data_storage_dict.pop("database_objects", [])
         if data_storage.database_objects is not None:
+            for db_object in data_storage.database_objects:
+                if db_object.schema_name != expected_schema:
+                    db_object.schema_name = expected_schema
             update_database_objects_schema_for_model(
                 original_data_storage.database_objects,
                 model_name,
                 data_storage.database_objects,
             )
+        else:
+            database_objects = get_object_filtred_by_model_name(
+                original_data_storage.database_objects,
+                model_name,
+                True,
+            )
+            for db_object in database_objects:
+                if db_object.schema_name != expected_schema:
+                    db_object.schema_name = expected_schema
         fields_payload = data_storage_dict.get("fields")
         if fields_payload is not None and data_storage.fields is not None:
             original_data_storage.sharding_key = self._generate_sharding_key_by_fields(data_storage.fields)
