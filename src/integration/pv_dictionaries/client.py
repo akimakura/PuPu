@@ -205,7 +205,6 @@ class ClientPVDictionaries:
     @staticmethod
     def _print_pvd_request(method: str, url: str, headers: dict, body: dict | None = None) -> None:
         """Печатает отправляемый запрос в PVD."""
-        print(f"PVD REQUEST method={method}; url={url}; headers={headers}; body={body}")
 
     async def create_hierarchy(self, payload: PVHierarchyPayload) -> dict:
         """РЎРѕР·РґР°С‚СЊ РёРµСЂР°СЂС…РёСЋ РІ PVD."""
@@ -215,7 +214,6 @@ class ClientPVDictionaries:
             ) as client:
                 url = urljoin(settings.PV_DICTIONARIES_URL, settings.PV_HIERARCHIES_CREATE_URL)
                 body = payload.model_dump(by_alias=True, exclude_none=True)
-                self._print_pvd_request("POST", url, self.headers, body)
                 logger.debug("PVD hierarchy create request: url=%s, body=%s", url, body)
                 response = await client.post(url, json=body)
                 response.raise_for_status()

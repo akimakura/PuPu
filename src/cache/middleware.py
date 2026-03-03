@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from inspect import isawaitable
 from typing import Any, Callable, Dict, Optional, cast
@@ -12,15 +13,27 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Match
 
 from src.cache import FastAPICache
-from src.cache.types import CacheHeaderEnum, KeyBuilder
+from src.cache.backends.redis import RedisBackend
+from src.cache.singleflight import SingleflightBarrier
+from src.cache.types import Backend, CacheHeaderEnum, KeyBuilder
 from src.config import settings
 from src.utils.auth import api_key_auth
 
 logger = logging.getLogger(__name__)
 
+_MAX_WAIT_ROUNDS = 2
+
 
 class ReadOnlyCacheMiddleware(BaseHTTPMiddleware):
-    """Отдает кэшированный ответ до выполнения DI, если это безопасно."""
+    """Отдает кэшированный ответ до выполнения DI, если это безопасно.
+
+    При промахе кэша использует паттерн Singleflight: только один запрос
+    идёт в обработчик (и далее в БД), а остальные ожидают появления
+    результата в кэше, что предотвращает перегрузку БД при холодном кэше.
+    """
+
+    _barrier: Optional[SingleflightBarrier] = None
+    _barrier_checked: bool = False
 
     async def dispatch(self, request: Request, call_next: Any) -> Response:
         logger.debug("CacheMiddleware invoked for %s %s", request.method, request.url.path)
@@ -82,21 +95,178 @@ class ReadOnlyCacheMiddleware(BaseHTTPMiddleware):
             logger.exception("Error retrieving cache key '%s' in middleware:", cache_key)
             return await call_next(request)
 
-        if cached is None or cache_control_header == CacheHeaderEnum.NO_CACHE:
+        if cached is not None and cache_control_header != CacheHeaderEnum.NO_CACHE:
+            return _build_cached_response(cached, ttl, cache_status_header, request)
+
+        if cache_control_header == CacheHeaderEnum.NO_CACHE:
             return await call_next(request)
 
-        etag = f"W/{hash(cached)}"
-        ttl_header = max(ttl, 0)
-        headers = {
-            "Cache-Control": f"max-age={ttl_header}",
-            "ETag": etag,
-            cache_status_header: "HIT",
-        }
+        # --- Singleflight: только один запрос идёт в БД при cache miss ---
 
-        if request.headers.get("if-none-match") == etag:
-            return Response(status_code=304, headers=headers)
+        barrier = self._get_barrier(backend)
+        if barrier is None:
+            return await call_next(request)
 
-        return Response(content=cached, media_type="application/json", headers=headers)
+        try:
+            acquired, token = await barrier.try_acquire(cache_key)
+        except Exception:
+            logger.exception("Singleflight: acquire error, falling back")
+            return await call_next(request)
+
+        if acquired:
+            try:
+                return await call_next(request)
+            finally:
+                await barrier.release(cache_key, token)
+
+        return await self._singleflight_wait(
+            cache_key, token, backend, barrier, cache_status_header, request, call_next,
+        )
+
+    async def _singleflight_wait(
+        self,
+        cache_key: str,
+        initial_token: str,
+        backend: Backend,
+        barrier: SingleflightBarrier,
+        cache_status_header: str,
+        request: Request,
+        call_next: Any,
+    ) -> Response:
+        """Ожидает появления данных в кэше или захватывает блокировку.
+
+        Поллит кэш с заданным интервалом. Если данные появляются — возвращает
+        их как ответ. Отслеживает смену владельца блокировки (новый токен) и
+        сбрасывает таймер ожидания, чтобы не конкурировать с новым владельцем.
+
+        При истечении таймаута для текущего владельца выполняет принудительный
+        захват блокировки через CAS. Только один из ожидающих запросов
+        успешно захватит блокировку; остальные продолжат ожидание нового
+        владельца в пределах общего лимита (``_MAX_WAIT_ROUNDS``).
+        """
+        watched_token = initial_token
+        holder_elapsed = 0.0
+        total_elapsed = 0.0
+        max_total_wait = barrier.wait_timeout * _MAX_WAIT_ROUNDS
+        my_token: Optional[str] = None
+
+        while total_elapsed < max_total_wait:
+            await asyncio.sleep(barrier.poll_interval)
+            holder_elapsed += barrier.poll_interval
+            total_elapsed += barrier.poll_interval
+
+            try:
+                ttl, cached = await backend.get_with_ttl(cache_key)
+                if cached is not None:
+                    logger.debug("Singleflight: cache populated during wait, key=%s", cache_key)
+                    return _build_cached_response(cached, ttl, cache_status_header, request)
+            except Exception:
+                logger.exception("Singleflight: error checking cache during wait")
+
+            try:
+                current_token = await barrier.get_lock_token(cache_key)
+            except Exception:
+                logger.exception("Singleflight: error checking lock, falling back")
+                break
+
+            if current_token is None:
+                try:
+                    ttl, cached = await backend.get_with_ttl(cache_key)
+                    if cached is not None:
+                        return _build_cached_response(cached, ttl, cache_status_header, request)
+                except Exception:
+                    pass
+
+                try:
+                    acq, tok = await barrier.try_acquire(cache_key)
+                    if acq:
+                        my_token = tok
+                        break
+                except Exception:
+                    logger.exception("Singleflight: error acquiring lock after release")
+                    break
+
+                try:
+                    current_token = await barrier.get_lock_token(cache_key)
+                except Exception:
+                    current_token = None
+                if current_token is not None and current_token != watched_token:
+                    watched_token = current_token
+                    holder_elapsed = 0.0
+                continue
+
+            if current_token != watched_token:
+                watched_token = current_token
+                holder_elapsed = 0.0
+                continue
+
+            if holder_elapsed >= barrier.wait_timeout:
+                try:
+                    acq, tok = await barrier.force_acquire(cache_key, watched_token)
+                    if acq:
+                        my_token = tok
+                        break
+                except Exception:
+                    logger.exception("Singleflight: force acquire error")
+                    break
+
+                try:
+                    new_token = await barrier.get_lock_token(cache_key)
+                except Exception:
+                    new_token = None
+                if new_token is not None and new_token != watched_token:
+                    watched_token = new_token
+                    holder_elapsed = 0.0
+                    continue
+                break
+
+        if my_token is None:
+            try:
+                ttl, cached = await backend.get_with_ttl(cache_key)
+                if cached is not None:
+                    return _build_cached_response(cached, ttl, cache_status_header, request)
+            except Exception:
+                pass
+
+        if my_token is not None:
+            try:
+                return await call_next(request)
+            finally:
+                await barrier.release(cache_key, my_token)
+
+        logger.debug("Singleflight: all attempts exhausted, proceeding without lock, key=%s", cache_key)
+        return await call_next(request)
+
+    def _get_barrier(self, backend: Backend) -> Optional[SingleflightBarrier]:
+        """Возвращает экземпляр ``SingleflightBarrier`` или ``None``.
+
+        Барьер создаётся лениво при первом вызове и только если:
+
+        - Singleflight включён в настройках (``ENABLE_SINGLEFLIGHT``).
+        - Бэкенд кэша — :class:`RedisBackend` (для ``InMemoryBackend``
+          паттерн не имеет смысла, т.к. нет распределённого доступа).
+        """
+        if not settings.ENABLE_SINGLEFLIGHT:
+            return None
+
+        if self._barrier is not None:
+            return self._barrier
+
+        if self._barrier_checked:
+            return None
+
+        ReadOnlyCacheMiddleware._barrier_checked = True
+
+        if not isinstance(backend, RedisBackend):
+            return None
+
+        ReadOnlyCacheMiddleware._barrier = SingleflightBarrier(
+            redis=backend.redis,
+            lock_ttl=settings.SINGLEFLIGHT_LOCK_TTL,
+            wait_timeout=settings.SINGLEFLIGHT_WAIT_TIMEOUT,
+            poll_interval=settings.SINGLEFLIGHT_POLL_INTERVAL,
+        )
+        return ReadOnlyCacheMiddleware._barrier
 
     def _match_route(self, request: Request) -> Optional[APIRoute]:
         """Находит подходящий APIRoute для текущего запроса."""
@@ -108,6 +278,27 @@ class ReadOnlyCacheMiddleware(BaseHTTPMiddleware):
             if match == Match.FULL:
                 return route
         return None
+
+
+def _build_cached_response(
+    cached: bytes,
+    ttl: int,
+    cache_status_header: str,
+    request: Request,
+) -> Response:
+    """Формирует HTTP-ответ из закешированных данных."""
+    etag = f"W/{hash(cached)}"
+    ttl_header = max(ttl, 0)
+    headers = {
+        "Cache-Control": f"max-age={ttl_header}",
+        "ETag": etag,
+        cache_status_header: "HIT",
+    }
+
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+
+    return Response(content=cached, media_type="application/json", headers=headers)
 
 
 def _requires_api_key(route: APIRoute) -> bool:

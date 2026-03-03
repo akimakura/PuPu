@@ -1306,3 +1306,4 @@ class CompositeRepository:
         database_object_repository = DatabaseObjectRepository(session)
         datastorage_repository = DataStorageRepository(session, model_repository, database_object_repository)
         return cls(session, model_repository, datastorage_repository, database_object_repository)
+

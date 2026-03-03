@@ -199,3 +199,4 @@ class DatabaseObjectRepository:
             .all()
         )
         self.history_repository.update_obj_version(relations, db_object.timestamp, db_object.user, db_object.version)
+

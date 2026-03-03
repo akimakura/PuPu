@@ -154,6 +154,11 @@ class Settings(BaseSettings):
     REDIS_PASSWORD: str = ""
     REDIS_DB: str = ""
     REDIS_URL: str = Field(default="", validate_default=True)
+    # ==== Настройки Singleflight (защита от thundering herd) ====
+    ENABLE_SINGLEFLIGHT: bool = True
+    SINGLEFLIGHT_LOCK_TTL: int = 30
+    SINGLEFLIGHT_WAIT_TIMEOUT: float = 10.0
+    SINGLEFLIGHT_POLL_INTERVAL: float = 0.1
     # ==== паттерны создания имен DataStorage ====
     VALUES_DATASTORAGE_PATTERN: str = "%s_values"
     TEXT_DATASTORAGE_PATTERN: str = "%s_texts"
@@ -389,39 +394,3 @@ try_hide_write_api(settings)
 
 models_limitations = read_static_file_as_dict(os.path.join(settings.PATH_TO_STATIC, "models_limitations.json"))
 
-print(
-    "[ENV_DEBUG] "
-    f"cwd={os.getcwd()} ENV_FILE={ENV_FILE} env_file_exists={os.path.exists(ENV_FILE)}"
-)
-for env_key in (
-    "ENABLE_SWITCH_MODEL_SCHEMA",
-    "ENABLE_SWITCH_HOST",
-    "ENABLE_LEGACY_MODEL_SCHEMA_OVERRIDE",
-):
-    print(
-        "[ENV_DEBUG] "
-        f"{env_key} settings={getattr(settings, env_key, None)} os={os.getenv(env_key)}"
-    )
-
-try:
-    from dotenv import dotenv_values
-
-    dotenv_map = dotenv_values(ENV_FILE)
-    schema_override_keys = sorted(
-        key
-        for key in dotenv_map
-        if key
-        and (
-            (key.startswith("MODEL_") and key.endswith("_SCHEMA_NAME"))
-            or (key.startswith("DB_") and key.endswith("_SCHEMA"))
-        )
-    )
-    print(f"[ENV_DEBUG] schema_override_keys_from_dotenv={schema_override_keys}")
-    for env_key in schema_override_keys:
-        print(
-            "[ENV_DEBUG] "
-            f"{env_key} dotenv={dotenv_map.get(env_key)} "
-            f"settings={getattr(settings, env_key, None)} os={os.getenv(env_key)}"
-        )
-except Exception as ex:
-    print(f"[ENV_DEBUG] dotenv parse error: {ex}")
