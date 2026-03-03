@@ -1,11 +1,12 @@
-import asyncio
 import logging
 import uuid
-from typing import Optional, Tuple, Union
+from typing import Any, Optional, Tuple, Union
 
 from redis.asyncio import Redis, RedisCluster
 
 logger = logging.getLogger(__name__)
+
+REDIS_ERROR = object()
 
 _RELEASE_LOCK_SCRIPT = """
 if redis.call("GET", KEYS[1]) == ARGV[1] then
@@ -68,6 +69,8 @@ class SingleflightBarrier:
         """Формирует ключ блокировки на основе ключа кэша."""
         return f"{self.LOCK_KEY_PREFIX}{cache_key}"
 
+    # ---- базовые операции (пробрасывают исключения) ---------------------
+
     async def try_acquire(self, cache_key: str) -> Tuple[bool, str]:
         """Попытка захватить блокировку для данного ключа кэша.
 
@@ -77,6 +80,8 @@ class SingleflightBarrier:
           запрос к источнику данных и затем вызвать :meth:`release`.
         - ``acquired=False``, ``token`` — токен текущего владельца блокировки.
           Вызывающий должен ожидать появления данных в кэше.
+
+        При ошибке Redis пробрасывает исключение.
         """
         lock_key = self._lock_key(cache_key)
         token = uuid.uuid4().hex
@@ -109,7 +114,10 @@ class SingleflightBarrier:
             logger.exception("Singleflight: error releasing lock, key=%s", cache_key)
 
     async def get_lock_token(self, cache_key: str) -> Optional[str]:
-        """Возвращает текущий токен блокировки или ``None``, если блокировка отсутствует."""
+        """Возвращает текущий токен блокировки или ``None``, если блокировка отсутствует.
+
+        При ошибке Redis пробрасывает исключение.
+        """
         lock_key = self._lock_key(cache_key)
         raw = await self._redis.get(lock_key)
         if raw is None:
@@ -126,22 +134,20 @@ class SingleflightBarrier:
         Если блокировка была заменена другим запросом (другой токен),
         операция завершается неудачей — это предотвращает одновременный
         принудительный захват несколькими ожидающими запросами.
+
+        При ошибке Redis пробрасывает исключение.
         """
         lock_key = self._lock_key(cache_key)
         new_token = uuid.uuid4().hex
 
-        try:
-            result = await self._redis.eval(
-                _FORCE_ACQUIRE_SCRIPT,
-                1,
-                lock_key,
-                expected_old_token,
-                new_token,
-                str(self._lock_ttl),
-            )
-        except Exception:
-            logger.exception("Singleflight: error during force acquire, key=%s", cache_key)
-            return False, ""
+        result = await self._redis.eval(
+            _FORCE_ACQUIRE_SCRIPT,
+            1,
+            lock_key,
+            expected_old_token,
+            new_token,
+            str(self._lock_ttl),
+        )
 
         if result:
             logger.debug("Singleflight: lock force-acquired, key=%s", cache_key)
@@ -149,6 +155,48 @@ class SingleflightBarrier:
 
         logger.debug("Singleflight: force acquire failed (lock replaced), key=%s", cache_key)
         return False, ""
+
+    # ---- безопасные обёртки (для цикла ожидания) -----------------------
+
+    async def safe_read_token(self, cache_key: str) -> Any:
+        """Читает текущий токен блокировки с подавлением ошибок Redis.
+
+        Возвращает:
+        - ``str`` — токен текущего владельца блокировки.
+        - ``None`` — блокировка отсутствует.
+        - :data:`REDIS_ERROR` — ошибка при обращении к Redis.
+        """
+        try:
+            return await self.get_lock_token(cache_key)
+        except Exception:
+            logger.exception("Singleflight: error reading lock token, key=%s", cache_key)
+            return REDIS_ERROR
+
+    async def safe_acquire(self, cache_key: str) -> Optional[str]:
+        """Пытается захватить блокировку с подавлением ошибок Redis.
+
+        Возвращает токен при успешном захвате или ``None`` (не удалось
+        захватить либо произошла ошибка Redis).
+        """
+        try:
+            acquired, token = await self.try_acquire(cache_key)
+            return token if acquired else None
+        except Exception:
+            logger.exception("Singleflight: error acquiring lock, key=%s", cache_key)
+            return None
+
+    async def safe_force_acquire(self, cache_key: str, expected_old_token: str) -> Optional[str]:
+        """Принудительно захватывает блокировку с подавлением ошибок Redis.
+
+        Возвращает новый токен при успешном захвате или ``None`` (не удалось
+        захватить либо произошла ошибка Redis).
+        """
+        try:
+            acquired, token = await self.force_acquire(cache_key, expected_old_token)
+            return token if acquired else None
+        except Exception:
+            logger.exception("Singleflight: force acquire error, key=%s", cache_key)
+            return None
 
     @property
     def wait_timeout(self) -> float:

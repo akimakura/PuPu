@@ -28,11 +28,6 @@ from src.service.hierarchy import HierarchyService
 from src.service.measure import MeasureService
 from src.service.model import ModelService
 from src.service.utils import get_diff_lst
-from src.utils.schema_override import (
-    apply_schema_override_to_database_objects,
-    apply_schema_override_to_model_payload,
-    get_model_schema_override,
-)
 
 logger = EPMPYLogger(__name__)
 
@@ -230,67 +225,6 @@ class AorService:
         obj.pop("pv_dictionary", None)
         obj.pop("pvDictionary", None)
 
-    def __get_models_with_schema_override(
-        self,
-        aor_type: AorType,
-        tenant_id: str,
-        model_names: list[str],
-    ) -> list[str]:
-        """Возвращает модели, для которых задан env-override схемы при деплое объекта."""
-        if aor_type not in {AorType.DATASTORAGE, AorType.COMPOSITE}:
-            return []
-        models_with_override = [
-            model_name for model_name in model_names if get_model_schema_override(tenant_id, model_name)
-        ]
-        return models_with_override
-
-    def __apply_schema_override_to_payload(
-        self,
-        push_command: PushAorCommand,
-        model_name: Optional[str] = None,
-    ) -> bool:
-        """
-        Применяет override схемы к payload деплоя.
-
-        Для `MODEL` обновляет поле схемы модели, для `DATASTORAGE/COMPOSITE`
-        обновляет `schemaName/schema_name` в `dbObjects`.
-        """
-        payload = push_command.data_json.data_json
-        tenant_id = push_command.data_json.tenant
-        if push_command.type in {AorType.DATASTORAGE, AorType.COMPOSITE} and not model_name:
-            payload_models = payload.get("models")
-            if isinstance(payload_models, list) and payload_models:
-                first_model = payload_models[0]
-                if isinstance(first_model, dict):
-                    model_name = first_model.get("name")
-                elif isinstance(first_model, str):
-                    model_name = first_model
-        if push_command.type == AorType.MODEL:
-            result = apply_schema_override_to_model_payload(payload, tenant_id)
-            return result
-        if push_command.type not in {AorType.DATASTORAGE, AorType.COMPOSITE} or not model_name:
-            return False
-
-        schema_override = get_model_schema_override(tenant_id, model_name)
-        if not schema_override:
-            return False
-
-        database_objects = payload.get("dbObjects")
-        if database_objects is None:
-            database_objects = payload.get("database_objects")
-        if not isinstance(database_objects, list):
-            return False
-        before_schemas = [
-            obj.get("schemaName") if isinstance(obj, dict) else getattr(obj, "schema_name", None)
-            for obj in database_objects
-        ]
-        result = apply_schema_override_to_database_objects(database_objects, schema_override)
-        after_schemas = [
-            obj.get("schemaName") if isinstance(obj, dict) else getattr(obj, "schema_name", None)
-            for obj in database_objects
-        ]
-        return result
-
     async def __get_commands_not_linked_to_model(
         self, command: PushAorCommand
     ) -> list[tuple[CommandEnum, Optional[str]]]:
@@ -371,21 +305,6 @@ class AorService:
         self.__clear_uncomparable_fields(comparable_payload)
         return comparable_payload
 
-    def __append_schema_override_update_commands(
-        self,
-        result: list[tuple[CommandEnum, Optional[str]]],
-        models_with_schema_override: list[str],
-        skip_models: Optional[set[str]] = None,
-    ) -> None:
-        """Добавляет UPDATE-команды для моделей с override схемы, если команды ещё не запланированы."""
-        skip_models = skip_models or set()
-        for model in models_with_schema_override:
-            if model in skip_models:
-                continue
-            if (CommandEnum.DELETE, model) in result or (CommandEnum.UPDATE, model) in result:
-                continue
-            result.append((CommandEnum.UPDATE, model))
-
     async def __get_commands_linked_to_model(self, command: PushAorCommand) -> list[tuple[CommandEnum, Optional[str]]]:
         """
         Возвращает список команд (create/update/copy/delete), для объектов, которые имеют привязку к моделям
@@ -427,11 +346,6 @@ class AorService:
             if new_model_obj:
                 _filtred_models.append(new_model)
         new_models = _filtred_models
-        models_with_schema_override = self.__get_models_with_schema_override(
-            command.type,
-            command.data_json.tenant,
-            new_models,
-        )
         if not new_models:
             raise ValueError("Deploy object MEASURE, DIMENSION, DATASTORAGE or Composite must have models")
         linked_to_model_object = await getters[command.type](
@@ -465,11 +379,6 @@ class AorService:
                             model,
                         )
                     )
-            self.__append_schema_override_update_commands(
-                result,
-                models_with_schema_override,
-                skip_models={new_models[0]},
-            )
             return result
         obj_dict = linked_to_model_object.model_dump(by_alias=True, mode="json")
         original_models = obj_dict.pop("models", [])
@@ -523,7 +432,6 @@ class AorService:
                 command.type,
                 command.data_json.data_json["name"],
             )
-        self.__append_schema_override_update_commands(result, models_with_schema_override)
         return result
 
     async def __get_commands_by_push_command(self, command: PushAorCommand) -> list[tuple[CommandEnum, Optional[str]]]:
@@ -575,7 +483,6 @@ class AorService:
                 push_command.data_json.tenant,
                 push_command.data_json.data_json["name"],
             )
-            self.__apply_schema_override_to_payload(push_command)
             CreatePydanticModel = pydantic_model_mappings[push_command.type][0]
             instance_create_pydantic_model: Any = CreatePydanticModel.model_validate(push_command.data_json.data_json)
             create_method = updaters[push_command.type][0]
@@ -591,7 +498,6 @@ class AorService:
                 push_command.data_json.tenant,
                 push_command.data_json.data_json["name"],
             )
-            self.__apply_schema_override_to_payload(push_command)
             UpdatePydanticModel = pydantic_model_mappings[push_command.type][1]
             instance_update_pydantic_model: Any = UpdatePydanticModel.model_validate(push_command.data_json.data_json)
             update_method = updaters[push_command.type][2]
@@ -695,7 +601,6 @@ class AorService:
                 command[1],
                 push_command.data_json.data_json["name"],
             )
-            self.__apply_schema_override_to_payload(push_command, command[1])
             CreatePydanticModel = pydantic_model_mappings[push_command.type][0]
             instance_create_pydantic_model: Any = CreatePydanticModel.model_validate(push_command.data_json.data_json)
             create_method = updaters[push_command.type][0]
@@ -751,7 +656,6 @@ class AorService:
                 command[1],
                 push_command.data_json.data_json["name"],
             )
-            self.__apply_schema_override_to_payload(push_command, command[1])
             UpdatePydanticModel = pydantic_model_mappings[push_command.type][1]
             instance_update_pydantic_model: Any = UpdatePydanticModel.model_validate(push_command.data_json.data_json)
             update_method = updaters[push_command.type][2]
@@ -878,7 +782,6 @@ class AorService:
             push_command.version,
         )
         self.pop_not_processed_fields(push_command.data_json.data_json)
-        self.__apply_schema_override_to_payload(push_command)
         commands = await self.__get_commands_by_push_command(push_command)
         for command in commands:
             if push_command.type in {AorType.DATABASE, AorType.MODEL}:

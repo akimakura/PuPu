@@ -14,7 +14,7 @@ from starlette.routing import Match
 
 from src.cache import FastAPICache
 from src.cache.backends.redis import RedisBackend
-from src.cache.singleflight import SingleflightBarrier
+from src.cache.singleflight import REDIS_ERROR, SingleflightBarrier
 from src.cache.types import Backend, CacheHeaderEnum, KeyBuilder
 from src.config import settings
 from src.utils.auth import api_key_auth
@@ -34,6 +34,8 @@ class ReadOnlyCacheMiddleware(BaseHTTPMiddleware):
 
     _barrier: Optional[SingleflightBarrier] = None
     _barrier_checked: bool = False
+
+    # ---- dispatch (точка входа) ----------------------------------------
 
     async def dispatch(self, request: Request, call_next: Any) -> Response:
         logger.debug("CacheMiddleware invoked for %s %s", request.method, request.url.path)
@@ -123,6 +125,8 @@ class ReadOnlyCacheMiddleware(BaseHTTPMiddleware):
             cache_key, token, backend, barrier, cache_status_header, request, call_next,
         )
 
+    # ---- singleflight: цикл ожидания -----------------------------------
+
     async def _singleflight_wait(
         self,
         cache_key: str,
@@ -155,43 +159,24 @@ class ReadOnlyCacheMiddleware(BaseHTTPMiddleware):
             holder_elapsed += barrier.poll_interval
             total_elapsed += barrier.poll_interval
 
-            try:
-                ttl, cached = await backend.get_with_ttl(cache_key)
-                if cached is not None:
-                    logger.debug("Singleflight: cache populated during wait, key=%s", cache_key)
-                    return _build_cached_response(cached, ttl, cache_status_header, request)
-            except Exception:
-                logger.exception("Singleflight: error checking cache during wait")
+            cached_response = await self._poll_cache(cache_key, backend, cache_status_header, request)
+            if cached_response is not None:
+                return cached_response
 
-            try:
-                current_token = await barrier.get_lock_token(cache_key)
-            except Exception:
-                logger.exception("Singleflight: error checking lock, falling back")
+            current_token = await barrier.safe_read_token(cache_key)
+            if current_token is REDIS_ERROR:
                 break
 
             if current_token is None:
-                try:
-                    ttl, cached = await backend.get_with_ttl(cache_key)
-                    if cached is not None:
-                        return _build_cached_response(cached, ttl, cache_status_header, request)
-                except Exception:
-                    pass
-
-                try:
-                    acq, tok = await barrier.try_acquire(cache_key)
-                    if acq:
-                        my_token = tok
-                        break
-                except Exception:
-                    logger.exception("Singleflight: error acquiring lock after release")
+                cached_response = await self._poll_cache(cache_key, backend, cache_status_header, request)
+                if cached_response is not None:
+                    return cached_response
+                my_token = await barrier.safe_acquire(cache_key)
+                if my_token is not None:
                     break
-
-                try:
-                    current_token = await barrier.get_lock_token(cache_key)
-                except Exception:
-                    current_token = None
-                if current_token is not None and current_token != watched_token:
-                    watched_token = current_token
+                refreshed = await barrier.safe_read_token(cache_key)
+                if refreshed not in (None, REDIS_ERROR) and refreshed != watched_token:
+                    watched_token = refreshed
                     holder_elapsed = 0.0
                 continue
 
@@ -201,32 +186,20 @@ class ReadOnlyCacheMiddleware(BaseHTTPMiddleware):
                 continue
 
             if holder_elapsed >= barrier.wait_timeout:
-                try:
-                    acq, tok = await barrier.force_acquire(cache_key, watched_token)
-                    if acq:
-                        my_token = tok
-                        break
-                except Exception:
-                    logger.exception("Singleflight: force acquire error")
+                my_token = await barrier.safe_force_acquire(cache_key, watched_token)
+                if my_token is not None:
                     break
-
-                try:
-                    new_token = await barrier.get_lock_token(cache_key)
-                except Exception:
-                    new_token = None
-                if new_token is not None and new_token != watched_token:
-                    watched_token = new_token
+                refreshed = await barrier.safe_read_token(cache_key)
+                if refreshed not in (None, REDIS_ERROR) and refreshed != watched_token:
+                    watched_token = refreshed
                     holder_elapsed = 0.0
                     continue
                 break
 
         if my_token is None:
-            try:
-                ttl, cached = await backend.get_with_ttl(cache_key)
-                if cached is not None:
-                    return _build_cached_response(cached, ttl, cache_status_header, request)
-            except Exception:
-                pass
+            cached_response = await self._poll_cache(cache_key, backend, cache_status_header, request)
+            if cached_response is not None:
+                return cached_response
 
         if my_token is not None:
             try:
@@ -236,6 +209,25 @@ class ReadOnlyCacheMiddleware(BaseHTTPMiddleware):
 
         logger.debug("Singleflight: all attempts exhausted, proceeding without lock, key=%s", cache_key)
         return await call_next(request)
+
+    async def _poll_cache(
+        self,
+        cache_key: str,
+        backend: Backend,
+        cache_status_header: str,
+        request: Request,
+    ) -> Optional[Response]:
+        """Проверяет наличие данных в кэше и возвращает готовый ответ или ``None``."""
+        try:
+            ttl, cached = await backend.get_with_ttl(cache_key)
+            if cached is not None:
+                logger.debug("Singleflight: cache populated during wait, key=%s", cache_key)
+                return _build_cached_response(cached, ttl, cache_status_header, request)
+        except Exception:
+            logger.exception("Singleflight: error checking cache, key=%s", cache_key)
+        return None
+
+    # ---- инициализация барьера -----------------------------------------
 
     def _get_barrier(self, backend: Backend) -> Optional[SingleflightBarrier]:
         """Возвращает экземпляр ``SingleflightBarrier`` или ``None``.
