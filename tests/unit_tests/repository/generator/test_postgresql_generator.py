@@ -139,6 +139,40 @@ class TestGeneratorPostgreSQLRepository:
             with pytest.raises(exception):
                 await GeneratorPostgreSQLRepository._get_data_query(query, database_model_list[0])
 
+    async def test_find_views_by_table_matches_only_exact_table_names(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        async def get_data_query_mock(query: str, database: DatabaseModel, params: Optional[dict] = None) -> list:
+            assert "LIKE" not in query
+            assert params == {"schema_name": "test_schema1"}
+            return [
+                (
+                    "test_schema1",
+                    "exact_view",
+                    "CREATE VIEW test_schema1.exact_view AS SELECT * FROM test_schema1.test_dso1",
+                ),
+                (
+                    "test_schema1",
+                    "partial_view",
+                    "CREATE VIEW test_schema1.partial_view AS SELECT * FROM test_schema1.test_dso11",
+                ),
+            ]
+
+        monkeypatch.setattr(GeneratorPostgreSQLRepository, "_get_data_query", get_data_query_mock)
+
+        result = await GeneratorPostgreSQLRepository.find_views_by_table(
+            database_model_list[1], "test_schema1", ["test_dso1"]
+        )
+
+        assert result == [
+            {
+                "view_schema": "test_schema1",
+                "view_name": "exact_view",
+                "view_definition": "CREATE VIEW test_schema1.exact_view AS SELECT * FROM test_schema1.test_dso1",
+            }
+        ]
+
     @pytest.mark.parametrize(
         (
             "schema_name",

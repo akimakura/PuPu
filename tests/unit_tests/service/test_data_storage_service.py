@@ -494,7 +494,7 @@ class TestDataStorageService:
                     {
                         "view_schema": schema_name,
                         "view_name": "test_dso1_view",
-                        "view_definition": "CREATE VIEW test_dso1_view AS SELECT 1",
+                        "view_definition": "CREATE VIEW test_dso1_view AS SELECT * FROM test_schema1.test_dso1_distr",
                     }
                 ]
 
@@ -548,6 +548,69 @@ class TestDataStorageService:
         ).scalars().one()
         assert relation.semantic_object_type == "DATA_STORAGE"
         assert relation.database_object_id == db_object.id
+
+    async def test_collect_views_for_model_skips_partial_table_name_matches(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        mocked_session: AsyncSession,
+        data_storages: list[DataStorage],
+        models: list[Model],
+    ) -> None:
+        """Проверяет, что VIEW не привязывается по частичному совпадению имени таблицы."""
+
+        class FakeGenerator:
+            async def find_views_by_table(
+                self, database: Any, schema_name: str, table_names: list[str]
+            ) -> list[dict[str, str]]:
+                return [
+                    {
+                        "view_schema": schema_name,
+                        "view_name": "test_dso1_shadow_view",
+                        "view_definition": (
+                            "CREATE VIEW test_dso1_shadow_view AS "
+                            "SELECT * FROM test_schema1.test_dso11"
+                        ),
+                    }
+                ]
+
+        mocked_session.add_all(models)
+        await mocked_session.commit()
+        mocked_session.add_all(data_storages)
+        await mocked_session.commit()
+
+        def fake_parse_view_ddl(ddl: str, view_name: str, dialect: Optional[str] = None) -> dict[str, Any]:
+            return {
+                "type": "VIEW",
+                "name": view_name,
+                "columns": [],
+                "dependencies": [{"type": "table", "name": "test_dso11"}],
+            }
+
+        monkeypatch.setattr("src.service.data_storage.get_generator", lambda model: FakeGenerator())
+        monkeypatch.setattr("src.service.data_storage.parse_view_ddl", fake_parse_view_ddl)
+
+        service = DataStorageService(
+            DataStorageRepository.get_by_session(mocked_session),
+            DimensionRepository.get_by_session(mocked_session),
+            ModelRelationsRepository.get_by_session(mocked_session),
+            ModelRepository.get_by_session(mocked_session),
+            DatabaseObjectRepository(mocked_session),
+            DatabaseObjectRelationsRepository(mocked_session),
+            TestWorkerManagerClient(),  # type: ignore
+            aor_client_mock,
+            AorRepository(mocked_session),
+        )
+        collected_ids = await service.collect_views_for_model(
+            "tenant1", "test_model1", ["test_dso1"], send_to_aor=False
+        )
+        assert collected_ids == []
+
+        view_count = (
+            await mocked_session.execute(
+                select(func.count(DatabaseObject.id)).where(DatabaseObject.type == DbObjectTypeEnum.VIEW)
+            )
+        ).scalar_one()
+        assert view_count == 0
 
     async def test_collect_views_for_model_returns_empty_when_no_views(
         self,

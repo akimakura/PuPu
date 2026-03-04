@@ -59,9 +59,28 @@ from src.repository.utils import get_database_object_names, get_filtred_database
 from src.service.utils import get_updated_fields_object, labels_by_row, read_upload_file_as_dataframe
 from src.utils.auth import get_user_login_by_token
 from src.utils.backoff import RetryConfig, retry
-from src.utils.view_parser import build_view_sql_expression, parse_view_ddl
+from src.utils.view_parser import build_view_sql_expression, contains_sql_identifier, parse_view_ddl
 
 logger = EPMPYLogger(__name__)
+
+
+def _get_view_dependency_names(view_json: dict[str, Any]) -> set[str]:
+    """Возвращает набор имен таблиц, от которых зависит VIEW."""
+    dependency_names: set[str] = set()
+    for dependency in view_json.get("dependencies") or []:
+        if dependency.get("type") != "table":
+            continue
+        dependency_name = dependency.get("name")
+        if dependency_name:
+            dependency_names.add(dependency_name)
+    return dependency_names
+
+
+def _view_depends_on_tables(view_definition: str, table_names: list[str], dependency_names: set[str]) -> bool:
+    """Проверяет зависимость VIEW от таблиц по точному имени."""
+    if dependency_names:
+        return any(table_name in dependency_names for table_name in table_names)
+    return any(contains_sql_identifier(view_definition, table_name) for table_name in table_names)
 
 
 class DataStorageService:
@@ -1194,24 +1213,30 @@ class DataStorageService:
                 view_definition = view["view_definition"]
                 if not view_definition:
                     continue
+                view_json_definition = parse_view_ddl(view_definition, view_name, dialect=dialect)
+                dependency_names = _get_view_dependency_names(view_json_definition)
+                matched_storages = [
+                    data_storage
+                    for data_storage, ds_table_names in schema_storages
+                    if _view_depends_on_tables(view_definition, ds_table_names, dependency_names)
+                ]
+                if not matched_storages:
+                    continue
                 cache_key = (view_schema, view_name)
                 db_object = db_object_cache.get(cache_key)
                 if cache_key not in db_object_cache:
-                    json_definition = parse_view_ddl(view_definition, view_name, dialect=dialect)
                     related_models = await self._get_models_by_schema(tenant_id, model.database_id, view_schema)
                     db_object = await self.database_object_repository.upsert_view(
                         tenant_id=tenant_id,
                         schema_name=view_schema,
                         name=view_name,
-                        json_definition=json_definition,
+                        json_definition=view_json_definition,
                         models=related_models,
                     )
                     db_object_cache[cache_key] = db_object
                 if db_object is None:
                     continue
-                for data_storage, ds_table_names in schema_storages:
-                    if not any(table_name in view_definition for table_name in ds_table_names):
-                        continue
+                for data_storage in matched_storages:
                     await self.database_object_relations_repository.ensure_relation(
                         semantic_object_type=SemanticObjectsTypeEnum.DATA_STORAGE,
                         semantic_object_id=data_storage.id,

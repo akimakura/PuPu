@@ -10,6 +10,14 @@ from sqlglot import expressions as exp
 logger = EPMPYLogger(__name__)
 
 
+def contains_sql_identifier(sql_text: str, identifier: str) -> bool:
+    """Проверяет, что идентификатор встречается в SQL как отдельное имя."""
+    if not sql_text or not identifier:
+        return False
+    pattern = rf"(?<![A-Za-z0-9_$]){re.escape(identifier)}(?![A-Za-z0-9_$])"
+    return re.search(pattern, sql_text) is not None
+
+
 def parse_view_ddl(ddl: str, view_name: str, dialect: Optional[str] = None) -> dict[str, Any]:
     """Преобразует DDL VIEW в расширенный JSON, пригодный для восстановления SQL."""
     ddl = ddl.strip().rstrip(";")

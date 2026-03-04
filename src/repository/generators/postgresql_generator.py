@@ -27,6 +27,7 @@ from src.repository.utils import (
     get_object_filtred_by_model_name,
 )
 from src.utils.backoff import RetryConfig, retry
+from src.utils.view_parser import contains_sql_identifier
 
 logger = EPMPYLogger(__name__)
 
@@ -180,16 +181,12 @@ class GeneratorPostgreSQLRepository(GeneratorRepository):
         """Ищет представления по списку таблиц через information_schema.views."""
         if not table_names:
             return []
-        patterns = [f"%{name}%" for name in table_names]
-        like_conditions = " OR ".join([f"view_definition LIKE :pattern_{index}" for index in range(len(patterns))])
         query = (
             "SELECT table_schema AS view_schema, table_name AS view_name, view_definition "
             "FROM information_schema.views "
-            f"WHERE ({like_conditions}) AND table_schema = :schema_name"
+            "WHERE table_schema = :schema_name"
         )
-        params = {"schema_name": schema_name}
-        params.update({f"pattern_{index}": pattern for index, pattern in enumerate(patterns)})
-        rows = await cls._get_data_query(query, database, params)
+        rows = await cls._get_data_query(query, database, {"schema_name": schema_name})
         return [
             {
                 "view_schema": row[0],
@@ -197,6 +194,7 @@ class GeneratorPostgreSQLRepository(GeneratorRepository):
                 "view_definition": row[2],
             }
             for row in rows
+            if row[2] and any(contains_sql_identifier(row[2], table_name) for table_name in table_names)
         ]
 
     @classmethod
