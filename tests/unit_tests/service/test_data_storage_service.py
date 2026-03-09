@@ -511,7 +511,12 @@ class TestDataStorageService:
             parse_calls["ddl"] = ddl
             parse_calls["view_name"] = view_name
             parse_calls["dialect"] = dialect
-            return {"type": "VIEW", "name": view_name, "columns": []}
+            return {
+                "type": "VIEW",
+                "name": view_name,
+                "columns": [],
+                "dependencies": [{"type": "table", "name": "test_dso1_distr"}],
+            }
 
         monkeypatch.setattr("src.service.data_storage.get_generator", lambda model: generator)
         monkeypatch.setattr("src.service.data_storage.parse_view_ddl", fake_parse_view_ddl)
@@ -539,7 +544,12 @@ class TestDataStorageService:
         ).scalars().one()
         assert db_object.name == "test_dso1_view"
         assert db_object.type == DbObjectTypeEnum.VIEW
-        assert db_object.json_definition == {"type": "VIEW", "name": "test_dso1_view", "columns": []}
+        assert db_object.json_definition == {
+            "type": "VIEW",
+            "name": "test_dso1_view",
+            "columns": [],
+            "dependencies": [{"type": "table", "name": "test_dso1_distr"}],
+        }
 
         relation = (
             await mocked_session.execute(

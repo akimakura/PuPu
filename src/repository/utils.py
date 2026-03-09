@@ -387,47 +387,6 @@ def get_object_filtred_by_model_name(objs: list[Any], model_name: str, is_equal_
         return [obj for obj in objs if all(model.name != model_name for model in obj.models)]
 
 
-def get_database_object_key(database_object: Any) -> tuple[str, str]:
-    """Строит ключ сопоставления dbObject по имени и типу."""
-    database_object_type = database_object.type
-    if hasattr(database_object_type, "value"):
-        database_object_type = database_object_type.value
-    return database_object.name, str(database_object_type)
-
-
-def update_database_objects_schema_for_model(
-    database_objects: list[Any],
-    model_name: str,
-    schema_update_database_objects: list[DatabaseObjectModel],
-) -> bool:
-    """
-    Обновляет schema_name у dbObjects только для указанной модели.
-
-    Сопоставление объектов выполняется по ключу `(name, type)`.
-    """
-    database_objects_for_model = get_object_filtred_by_model_name(
-        database_objects,
-        model_name,
-        True,
-    )
-    update_mapping = {
-        get_database_object_key(database_object): database_object
-        for database_object in schema_update_database_objects
-        if database_object.schema_name
-    }
-    if not update_mapping:
-        return False
-
-    changed = False
-    for database_object in database_objects_for_model:
-        update_object = update_mapping.get(get_database_object_key(database_object))
-        if update_object is None or database_object.schema_name == update_object.schema_name:
-            continue
-        database_object.schema_name = update_object.schema_name
-        changed = True
-    return changed
-
-
 def get_filtred_database_object_by_data_storage(
     object_with_db_objects: Any, model_name: str
 ) -> list[DatabaseObjectModel]:

@@ -64,25 +64,6 @@ from src.utils.view_parser import build_view_sql_expression, contains_sql_identi
 logger = EPMPYLogger(__name__)
 
 
-def _get_view_dependency_names(view_json: dict[str, Any]) -> set[str]:
-    """Возвращает набор имен таблиц, от которых зависит VIEW."""
-    dependency_names: set[str] = set()
-    for dependency in view_json.get("dependencies") or []:
-        if dependency.get("type") != "table":
-            continue
-        dependency_name = dependency.get("name")
-        if dependency_name:
-            dependency_names.add(dependency_name)
-    return dependency_names
-
-
-def _view_depends_on_tables(view_definition: str, table_names: list[str], dependency_names: set[str]) -> bool:
-    """Проверяет зависимость VIEW от таблиц по точному имени."""
-    if dependency_names:
-        return any(table_name in dependency_names for table_name in table_names)
-    return any(contains_sql_identifier(view_definition, table_name) for table_name in table_names)
-
-
 class DataStorageService:
     def __init__(
         self,
@@ -1214,12 +1195,23 @@ class DataStorageService:
                 if not view_definition:
                     continue
                 view_json_definition = parse_view_ddl(view_definition, view_name, dialect=dialect)
-                dependency_names = _get_view_dependency_names(view_json_definition)
-                matched_storages = [
-                    data_storage
-                    for data_storage, ds_table_names in schema_storages
-                    if _view_depends_on_tables(view_definition, ds_table_names, dependency_names)
-                ]
+                dependency_names: set[str] = set()
+                for dependency in view_json_definition.get("dependencies") or []:
+                    if dependency.get("type") != "table":
+                        continue
+                    dependency_name = dependency.get("name")
+                    if dependency_name:
+                        dependency_names.add(dependency_name)
+                matched_storages = []
+                for data_storage, ds_table_names in schema_storages:
+                    if dependency_names:
+                        has_dependency = any(table_name in dependency_names for table_name in ds_table_names)
+                    else:
+                        has_dependency = any(
+                            contains_sql_identifier(view_definition, table_name) for table_name in ds_table_names
+                        )
+                    if has_dependency:
+                        matched_storages.append(data_storage)
                 if not matched_storages:
                     continue
                 cache_key = (view_schema, view_name)

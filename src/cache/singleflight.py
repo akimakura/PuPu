@@ -7,6 +7,7 @@ from redis.asyncio import Redis, RedisCluster
 logger = logging.getLogger(__name__)
 
 REDIS_ERROR = object()
+MAX_WAIT_ROUNDS = 2
 
 _RELEASE_LOCK_SCRIPT = """
 if redis.call("GET", KEYS[1]) == ARGV[1] then
@@ -72,7 +73,8 @@ class SingleflightBarrier:
     # ---- базовые операции (пробрасывают исключения) ---------------------
 
     async def try_acquire(self, cache_key: str) -> Tuple[bool, str]:
-        """Попытка захватить блокировку для данного ключа кэша.
+        """
+        Попытка захватить блокировку для данного ключа кэша.
 
         Возвращает кортеж ``(acquired, token)``:
 
@@ -98,7 +100,8 @@ class SingleflightBarrier:
         return False, current_token
 
     async def release(self, cache_key: str, token: str) -> None:
-        """Освобождает блокировку, если мы всё ещё являемся её владельцем.
+        """
+        Освобождает блокировку, если мы всё ещё являемся её владельцем.
 
         Используется атомарный Lua-скрипт: блокировка удаляется только
         при совпадении текущего значения с переданным ``token``.
@@ -114,7 +117,8 @@ class SingleflightBarrier:
             logger.exception("Singleflight: error releasing lock, key=%s", cache_key)
 
     async def get_lock_token(self, cache_key: str) -> Optional[str]:
-        """Возвращает текущий токен блокировки или ``None``, если блокировка отсутствует.
+        """
+        Возвращает текущий токен блокировки или ``None``, если блокировка отсутствует.
 
         При ошибке Redis пробрасывает исключение.
         """
@@ -125,7 +129,8 @@ class SingleflightBarrier:
         return raw.decode() if isinstance(raw, bytes) else raw
 
     async def force_acquire(self, cache_key: str, expected_old_token: str) -> Tuple[bool, str]:
-        """Принудительный захват блокировки при таймауте ожидания.
+        """
+        Принудительный захват блокировки при таймауте ожидания.
 
         Атомарно (через Lua-скрипт с CAS) заменяет блокировку новым
         токеном, только если текущее значение совпадает с
@@ -159,7 +164,8 @@ class SingleflightBarrier:
     # ---- безопасные обёртки (для цикла ожидания) -----------------------
 
     async def safe_read_token(self, cache_key: str) -> Any:
-        """Читает текущий токен блокировки с подавлением ошибок Redis.
+        """
+        Читает текущий токен блокировки с подавлением ошибок Redis.
 
         Возвращает:
         - ``str`` — токен текущего владельца блокировки.

@@ -14,14 +14,12 @@ from starlette.routing import Match
 
 from src.cache import FastAPICache
 from src.cache.backends.redis import RedisBackend
-from src.cache.singleflight import REDIS_ERROR, SingleflightBarrier
+from src.cache.singleflight import MAX_WAIT_ROUNDS, REDIS_ERROR, SingleflightBarrier
 from src.cache.types import Backend, CacheHeaderEnum, KeyBuilder
 from src.config import settings
 from src.utils.auth import api_key_auth
 
 logger = logging.getLogger(__name__)
-
-_MAX_WAIT_ROUNDS = 2
 
 
 class ReadOnlyCacheMiddleware(BaseHTTPMiddleware):
@@ -146,12 +144,12 @@ class ReadOnlyCacheMiddleware(BaseHTTPMiddleware):
         При истечении таймаута для текущего владельца выполняет принудительный
         захват блокировки через CAS. Только один из ожидающих запросов
         успешно захватит блокировку; остальные продолжат ожидание нового
-        владельца в пределах общего лимита (``_MAX_WAIT_ROUNDS``).
+        владельца в пределах общего лимита (``MAX_WAIT_ROUNDS``).
         """
         watched_token = initial_token
         holder_elapsed = 0.0
         total_elapsed = 0.0
-        max_total_wait = barrier.wait_timeout * _MAX_WAIT_ROUNDS
+        max_total_wait = barrier.wait_timeout * MAX_WAIT_ROUNDS
         my_token: Optional[str] = None
 
         while total_elapsed < max_total_wait:
