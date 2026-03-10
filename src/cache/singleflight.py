@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Optional, Protocol, Tuple, Union, cast
 
 from redis.asyncio import Redis, RedisCluster
 
@@ -35,6 +35,18 @@ end
 """
 
 
+class _SingleflightRedisClient(Protocol):
+
+    async def set(self, key: str, value: str, nx: bool = False, ex: Optional[int] = None) -> bool | None:
+        pass
+
+    async def get(self, key: str) -> Optional[bytes | str]:
+        pass
+
+    async def eval(self, script: str, numkeys: int, *keys_and_args: str) -> Any:
+        pass
+
+
 class SingleflightBarrier:
     """Распределённый барьер для паттерна Singleflight на основе Redis.
 
@@ -61,7 +73,7 @@ class SingleflightBarrier:
         wait_timeout: float = 10.0,
         poll_interval: float = 0.1,
     ) -> None:
-        self._redis = redis
+        self._redis = cast(_SingleflightRedisClient, redis)
         self._lock_ttl = lock_ttl
         self._wait_timeout = wait_timeout
         self._poll_interval = poll_interval
@@ -91,12 +103,10 @@ class SingleflightBarrier:
         acquired = await self._redis.set(lock_key, token, nx=True, ex=self._lock_ttl)
 
         if acquired:
-            logger.debug("Singleflight: lock acquired, key=%s", cache_key)
             return True, token
 
         current_raw = await self._redis.get(lock_key)
         current_token = current_raw.decode() if isinstance(current_raw, bytes) else (current_raw or "")
-        logger.debug("Singleflight: lock busy, key=%s, holder=%s…", cache_key, current_token[:8])
         return False, current_token
 
     async def release(self, cache_key: str, token: str) -> None:
@@ -108,11 +118,7 @@ class SingleflightBarrier:
         """
         lock_key = self._lock_key(cache_key)
         try:
-            result = await self._redis.eval(_RELEASE_LOCK_SCRIPT, 1, lock_key, token)
-            if result:
-                logger.debug("Singleflight: lock released, key=%s", cache_key)
-            else:
-                logger.debug("Singleflight: lock already expired/replaced, key=%s", cache_key)
+            await self._redis.eval(_RELEASE_LOCK_SCRIPT, 1, lock_key, token)
         except Exception:
             logger.exception("Singleflight: error releasing lock, key=%s", cache_key)
 

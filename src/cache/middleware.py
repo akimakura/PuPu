@@ -96,7 +96,7 @@ class ReadOnlyCacheMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         if cached is not None and cache_control_header != CacheHeaderEnum.NO_CACHE:
-            return _build_cached_response(cached, ttl, cache_status_header, request)
+            return self._build_cached_response(cached, ttl, cache_status_header, request)
 
         if cache_control_header == CacheHeaderEnum.NO_CACHE:
             return await call_next(request)
@@ -220,7 +220,7 @@ class ReadOnlyCacheMiddleware(BaseHTTPMiddleware):
             ttl, cached = await backend.get_with_ttl(cache_key)
             if cached is not None:
                 logger.debug("Singleflight: cache populated during wait, key=%s", cache_key)
-                return _build_cached_response(cached, ttl, cache_status_header, request)
+                return self._build_cached_response(cached, ttl, cache_status_header, request)
         except Exception:
             logger.exception("Singleflight: error checking cache, key=%s", cache_key)
         return None
@@ -268,6 +268,27 @@ class ReadOnlyCacheMiddleware(BaseHTTPMiddleware):
             if match == Match.FULL:
                 return route
         return None
+
+    @staticmethod
+    def _build_cached_response(
+        cached: bytes,
+        ttl: int,
+        cache_status_header: str,
+        request: Request,
+    ) -> Response:
+        """Build a response object from cached payload."""
+        etag = f"W/{hash(cached)}"
+        ttl_header = max(ttl, 0)
+        headers = {
+            "Cache-Control": f"max-age={ttl_header}",
+            "ETag": etag,
+            cache_status_header: "HIT",
+        }
+
+        if request.headers.get("if-none-match") == etag:
+            return Response(status_code=304, headers=headers)
+
+        return Response(content=cached, media_type="application/json", headers=headers)
 
 
 def _build_cached_response(
