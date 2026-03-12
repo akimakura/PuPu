@@ -39,14 +39,20 @@ class DatabaseObjectRelationsRepository:
         self, semantic_object_type: SemanticObjectsTypeEnum, semantic_object_id: int, database_object_id: int
     ) -> int:
         """Возвращает следующую версию для новой связи."""
+        history_model = DatabaseObjectRelation.__history_mapper__.class_  # type: ignore
         query = select(func.max(DatabaseObjectRelation.version)).where(
             DatabaseObjectRelation.semantic_object_type == semantic_object_type,
             DatabaseObjectRelation.semantic_object_id == semantic_object_id,
             DatabaseObjectRelation.database_object_id == database_object_id,
         )
-        result = await self.session.execute(query)
-        current = result.scalar()
-        return (current or 0) + 1
+        history_query = select(func.max(history_model.version)).where(
+            history_model.semantic_object_type == semantic_object_type,
+            history_model.semantic_object_id == semantic_object_id,
+            history_model.database_object_id == database_object_id,
+        )
+        current = (await self.session.execute(query)).scalar()
+        history = (await self.session.execute(history_query)).scalar()
+        return max(current or 0, history or 0) + 1
 
     async def ensure_relation(
         self,
@@ -86,6 +92,7 @@ class DatabaseObjectRelationsRepository:
         self, tenant_id: str, database_object_id: int, database_object_version: int
     ) -> list[tuple[str, int]]:
         """Возвращает список родительских DATA_STORAGE для указанного database_object."""
+        history_model = DatabaseObjectRelation.__history_mapper__.class_  # type: ignore
         query = (
             select(DataStorage.name, DatabaseObjectRelation.semantic_object_version)
             .select_from(DatabaseObjectRelation)
@@ -98,7 +105,22 @@ class DatabaseObjectRelationsRepository:
                 DataStorage.tenant_id == tenant_id,
             )
         )
-        return list((await self.session.execute(query)).tuples().all())
+        history_query = (
+            select(DataStorage.name, history_model.semantic_object_version)
+            .select_from(history_model)
+            .join(DataStorage, DataStorage.id == history_model.semantic_object_id)
+            .where(
+                history_model.semantic_object_type == SemanticObjectsTypeEnum.DATA_STORAGE,
+                history_model.relation_type == DatabaseObjectRelationTypeEnum.PARENT,
+                history_model.database_object_id == database_object_id,
+                history_model.database_object_version == database_object_version,
+                history_model.deleted.is_(False),
+                DataStorage.tenant_id == tenant_id,
+            )
+        )
+        current_parents = list((await self.session.execute(query)).tuples().all())
+        history_parents = list((await self.session.execute(history_query)).tuples().all())
+        return sorted(set(current_parents + history_parents), key=lambda parent: (parent[0], parent[1]))
 
     async def get_views_by_datastorage(
         self,
