@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy import Boolean, ForeignKey, Integer, String
 from sqlalchemy.orm import mapped_column, relationship
 from sqlalchemy.orm.base import Mapped
 
@@ -29,6 +29,7 @@ class AnyField(FieldTypeMixin, Versioned, Base):
     scale: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     aggregation_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     precision: Mapped[int] = mapped_column(Integer, nullable=True, default=None)
+    allow_null_values: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Relationships
     labels: Mapped[list["AnyFieldLabel"]] = relationship(
         back_populates="any_field", lazy="selectin", cascade="all,delete"

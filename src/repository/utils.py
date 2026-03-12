@@ -18,7 +18,7 @@ from src.db.measure import Measure
 from src.db.model import Model
 from src.models.consts import TEXT_TO_LENGTH
 from src.models.database_object import DatabaseObject as DatabaseObjectModel, DatabaseObjectNames, DbObjectTypeEnum
-from src.models.field import BaseFieldTypeEnum
+from src.models.field import BaseFieldTypeEnum, SemanticType
 from src.models.label import LabelType, Language
 from src.models.model import Model as ModelModel
 from src.models.request_params import Pagination, SortDirectionEnum
@@ -211,7 +211,35 @@ def convert_anyfield_dict_to_orm(
 ) -> AnyField:
     """Конвертирует AnyField из словаря в модель SQLalchemy AnyField"""
     any_field["labels"] = convert_labels_list_to_orm(any_field.pop("labels", []), AnyFieldLabel)
+    any_field["allow_null_values"] = (
+        False if any_field.get("allow_null_values") is None else any_field.get("allow_null_values")
+    )
     return AnyField(**any_field)
+
+
+def resolve_data_storage_field_allow_null_values_local(
+    field: dict[str, Any], field_type: BaseFieldTypeEnum, object_field: AnyField | Measure | Dimension
+) -> bool:
+    semantic_type = field.get("semantic_type")
+    allow_null_values_local = field.get("allow_null_values_local")
+
+    if semantic_type != SemanticType.MEASURE:
+        if allow_null_values_local:
+            raise ValueError("allow_null_values_local can be true only for measure fields")
+        return False
+
+    if field_type == BaseFieldTypeEnum.MEASURE and isinstance(object_field, Measure):
+        measure_allow_null_values = bool(getattr(object_field, "allow_null_values", False))
+        if allow_null_values_local is None:
+            return measure_allow_null_values
+        if allow_null_values_local and not measure_allow_null_values:
+            raise ValueError("allow_null_values_local cannot be true when measure.allow_null_values is false")
+        return allow_null_values_local
+
+    if field_type == BaseFieldTypeEnum.ANYFIELD and isinstance(object_field, AnyField):
+        return False
+
+    return False
 
 
 async def convert_ref_type_to_orm(
@@ -269,6 +297,9 @@ async def convert_field_to_orm(
         field["is_key"] = False if field.get("is_key") is None else field.get("is_key")
         field["is_sharding_key"] = False if field.get("is_sharding_key") is None else field.get("is_sharding_key")
         field["is_tech_field"] = False if field.get("is_tech_field") is None else field.get("is_tech_field")
+        field["allow_null_values_local"] = resolve_data_storage_field_allow_null_values_local(
+            field=field, field_type=ref_type["ref_object_type"], object_field=object_field
+        )
     if field["field_type"] == BaseFieldTypeEnum.MEASURE and isinstance(object_field, Measure):
         field["measure_id"] = object_field.id
         measure = object_field
@@ -373,6 +404,16 @@ def get_field_type_with_length(field: DataStorageField) -> tuple[Optional[int], 
             cannot be converted to a type"""
         )
     return precision, scale, field_type
+
+
+def is_nullable_measure_field(field: DataStorageField) -> bool:
+    if field.semantic_type != SemanticType.MEASURE:
+        return False
+    if field.field_type == BaseFieldTypeEnum.MEASURE:
+        return bool(getattr(field, "allow_null_values_local", False))
+    if field.field_type == BaseFieldTypeEnum.ANYFIELD and field.any_field:
+        return bool(getattr(field.any_field, "allow_null_values", False))
+    return False
 
 
 def get_object_filtred_by_model_name(objs: list[Any], model_name: str, is_equal_model_name: bool = False) -> list[Any]:

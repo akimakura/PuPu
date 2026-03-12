@@ -10,6 +10,8 @@ from py_common_lib.logger import EPMPYLogger
 from sqlalchemy import func, select
 
 from src.db.data_storage import DataStorage, DataStorageModelRelation
+from src.db.database_object import DatabaseObjectRelation
+from src.models.tenant import SemanticObjectsTypeEnum
 from src.pkg.history_meta.history_meta import obj_attr_changed
 from src.repository.history.base_history import BaseHistoryRepository
 from src.repository.history.utils import get_database_object_relations
@@ -180,6 +182,23 @@ class DataStorageHistoryRepository(BaseHistoryRepository):
 
         model_relations = await self.get_data_storage_model_relation(datastorage)
         await self.copy_obj_to_history(model_relations, deleted)
+
+        database_object_relations = (
+            (
+                await self.session.execute(
+                    select(DatabaseObjectRelation).where(
+                        DatabaseObjectRelation.semantic_object_type == SemanticObjectsTypeEnum.DATA_STORAGE,
+                        DatabaseObjectRelation.semantic_object_id == datastorage.id,
+                        DatabaseObjectRelation.semantic_object_version == datastorage.version,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        await self.copy_obj_to_history(database_object_relations, deleted)
+        for relation in database_object_relations:
+            await self.session.delete(relation)
 
         await self.copy_obj_to_history(datastorage.database_objects, deleted)
         db_object_model_relations = await get_database_object_relations(self.session, datastorage.database_objects)

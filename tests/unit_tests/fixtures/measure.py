@@ -273,6 +273,7 @@ measure_model_list = [
         aggregation_type=AggregationTypeEnum.MAXIMUM,
         scale=1,
         auth_relevant=True,
+        allow_null_values=True,
         unit_of_measure="test_dim4",
         labels=[
             Label(
@@ -330,6 +331,7 @@ measure_model_create_list = [
         aggregation_type=AggregationTypeEnum.MAXIMUM,
         scale=1,
         auth_relevant=True,
+        allow_null_values=True,
         unit_of_measure="test_dim4",
         labels=[
             Label(
@@ -382,6 +384,7 @@ measure_model_update_list = [
         aggregation_type=AggregationTypeEnum.MAXIMUM,
         scale=1,
         auth_relevant=False,
+        allow_null_values=True,
         unit_of_measure=DimensionValueRequest(
             dimension_id="test_dim1",
             dimension_value="test_dim1_value",

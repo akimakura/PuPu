@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Any, Optional, Protocol, Tuple, Union, cast
+from typing import Any, Optional, Tuple, Union
 
 from redis.asyncio import Redis, RedisCluster
 
@@ -35,18 +35,6 @@ end
 """
 
 
-class _SingleflightRedisClient(Protocol):
-
-    async def set(self, key: str, value: str, nx: bool = False, ex: Optional[int] = None) -> bool | None:
-        pass
-
-    async def get(self, key: str) -> Optional[bytes | str]:
-        pass
-
-    async def eval(self, script: str, numkeys: int, *keys_and_args: str) -> Any:
-        pass
-
-
 class SingleflightBarrier:
     """Распределённый барьер для паттерна Singleflight на основе Redis.
 
@@ -73,7 +61,7 @@ class SingleflightBarrier:
         wait_timeout: float = 10.0,
         poll_interval: float = 0.1,
     ) -> None:
-        self._redis = cast(_SingleflightRedisClient, redis)
+        self._redis = redis
         self._lock_ttl = lock_ttl
         self._wait_timeout = wait_timeout
         self._poll_interval = poll_interval
@@ -100,12 +88,12 @@ class SingleflightBarrier:
         lock_key = self._lock_key(cache_key)
         token = uuid.uuid4().hex
 
-        acquired = await self._redis.set(lock_key, token, nx=True, ex=self._lock_ttl)
+        acquired = await self._redis.set(lock_key, token, nx=True, ex=self._lock_ttl)  # type: ignore[union-attr]
 
         if acquired:
             return True, token
 
-        current_raw = await self._redis.get(lock_key)
+        current_raw = await self._redis.get(lock_key)  # type: ignore[union-attr]
         current_token = current_raw.decode() if isinstance(current_raw, bytes) else (current_raw or "")
         return False, current_token
 
@@ -118,7 +106,7 @@ class SingleflightBarrier:
         """
         lock_key = self._lock_key(cache_key)
         try:
-            await self._redis.eval(_RELEASE_LOCK_SCRIPT, 1, lock_key, token)
+            await self._redis.eval(_RELEASE_LOCK_SCRIPT, 1, lock_key, token)  # type: ignore[union-attr]
         except Exception:
             logger.exception("Singleflight: error releasing lock, key=%s", cache_key)
 
@@ -129,7 +117,7 @@ class SingleflightBarrier:
         При ошибке Redis пробрасывает исключение.
         """
         lock_key = self._lock_key(cache_key)
-        raw = await self._redis.get(lock_key)
+        raw = await self._redis.get(lock_key)  # type: ignore[union-attr]
         if raw is None:
             return None
         return raw.decode() if isinstance(raw, bytes) else raw
@@ -151,7 +139,7 @@ class SingleflightBarrier:
         lock_key = self._lock_key(cache_key)
         new_token = uuid.uuid4().hex
 
-        result = await self._redis.eval(
+        result = await self._redis.eval(  # type: ignore[union-attr]
             _FORCE_ACQUIRE_SCRIPT,
             1,
             lock_key,

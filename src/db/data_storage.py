@@ -133,6 +133,7 @@ class DataStorageField(Base, FieldMixin, Versioned):
     data_storage_id: Mapped[int] = mapped_column(ForeignKey("data_storage.id"), nullable=False)
     is_sharding_key: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     is_tech_field: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    allow_null_values_local: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     # Relationships
     data_storage: Mapped["DataStorage"] = relationship(

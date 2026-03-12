@@ -24,6 +24,7 @@ from src.repository.utils import (
     get_field_type_with_length,
     get_filtred_database_object_by_data_storage,
     get_ip_address_by_dns_name,
+    is_nullable_measure_field,
     get_object_filtred_by_model_name,
 )
 from src.utils.backoff import RetryConfig, retry
@@ -49,12 +50,19 @@ class GeneratorPostgreSQLRepository(GeneratorRepository):
         return result
 
     @classmethod
-    def _get_create_column_sql(cls, field_name: str, field_type: str, default_value: Optional[str] = None) -> str:
+    def _get_create_column_sql(
+        cls,
+        field_name: str,
+        field_type: str,
+        default_value: Optional[str] = None,
+        is_nullable: bool = False,
+    ) -> str:
         """
         Создать запрос на добавление колонки.
         """
         default_value = f" DEFAULT {default_value}" if default_value is not None else ""
-        return f'ADD COLUMN IF NOT EXISTS "{field_name}" {field_type} NOT NULL{default_value}'
+        not_null = "" if is_nullable else " NOT NULL"
+        return f'ADD COLUMN IF NOT EXISTS "{field_name}" {field_type}{not_null}{default_value}'
 
     @classmethod
     def _get_delete_view_sql(cls, schema_name: str, name: str, cluster_name: Optional[str] = None) -> str:
@@ -103,6 +111,8 @@ class GeneratorPostgreSQLRepository(GeneratorRepository):
         else:
             result_field_type = DATA_TYPES[db_type][field_type]
         if without_null:
+            return result_field_type
+        if is_nullable_measure_field(field):
             return result_field_type
         default_value = cls.get_default_value_by_field(field, db_type)
         if default_value is not None:
@@ -215,14 +225,28 @@ class GeneratorPostgreSQLRepository(GeneratorRepository):
         return possible_to_drop
 
     @classmethod
-    def _get_modify_column_sql(cls, field_name: str, field_type: str, default_value: Optional[str] = None) -> list[str]:
+    def _get_modify_column_sql(
+        cls,
+        field_name: str,
+        field_type: str,
+        default_value: Optional[str] = None,
+        is_nullable: bool = False,
+        current_field_type: Optional[str] = None,
+        current_is_nullable: bool = False,
+    ) -> list[str]:
         """
         Создать запрос на изменение колонки.
         """
-        sql_expressions = [
-            f'ALTER COLUMN "{field_name}" DROP DEFAULT;',
-            f'ALTER COLUMN "{field_name}" TYPE {field_type} USING "{field_name}"::{field_type}',
-        ]
+        sql_expressions = [f'ALTER COLUMN "{field_name}" DROP DEFAULT;']
+        if current_field_type != field_type:
+            sql_expressions.append(f'ALTER COLUMN "{field_name}" TYPE {field_type} USING "{field_name}"::{field_type}')
+        if is_nullable:
+            if not current_is_nullable:
+                sql_expressions.append(f'ALTER COLUMN "{field_name}" DROP NOT NULL')
+            return sql_expressions
+        if current_is_nullable and default_value is not None:
+            sql_expressions.append(f'__UPDATE_NULLS__|{field_name}|{default_value}')
+            sql_expressions.append(f'ALTER COLUMN "{field_name}" SET NOT NULL')
         if default_value is not None:
             sql_expressions.append(f'ALTER COLUMN "{field_name}" SET DEFAULT {default_value}')
         return sql_expressions
@@ -314,7 +338,8 @@ class GeneratorPostgreSQLRepository(GeneratorRepository):
     ) -> dict[str, dict[str, Any]]:
         query = (
             "SELECT a.attname AS column_name, t.typname AS internal_data_type, "
-            "CASE WHEN i.indisprimary AND a.attnum = ANY(i.indkey) THEN true ELSE false END AS is_primary_key "
+            "CASE WHEN i.indisprimary AND a.attnum = ANY(i.indkey) THEN true ELSE false END AS is_primary_key, "
+            "NOT a.attnotnull AS is_nullable "
             "FROM pg_attribute a "
             "JOIN pg_class c ON a.attrelid = c.oid "
             "JOIN pg_type t ON a.atttypid = t.oid "
@@ -332,6 +357,7 @@ class GeneratorPostgreSQLRepository(GeneratorRepository):
                 {
                     "data_type": field_description[1],
                     "is_primary_key": field_description[2],
+                    "is_nullable": field_description[3],
                 }
             )
         return result
@@ -361,9 +387,15 @@ class GeneratorPostgreSQLRepository(GeneratorRepository):
         sql_expressions_for_execute = []
         for database_object in database_objects:
             for sql_expression in sql_expressions:
-                sql_expressions_for_execute.append(
-                    f"ALTER TABLE {database_object.schema_name}.{database_object.name} {sql_expression}"
-                )
+                if sql_expression.startswith("__UPDATE_NULLS__|"):
+                    _, field_name, default_value = sql_expression.split("|", maxsplit=2)
+                    sql_expressions_for_execute.append(
+                        f'UPDATE {database_object.schema_name}.{database_object.name} SET "{field_name}" = {default_value} WHERE "{field_name}" IS NULL'
+                    )
+                else:
+                    sql_expressions_for_execute.append(
+                        f"ALTER TABLE {database_object.schema_name}.{database_object.name} {sql_expression}"
+                    )
 
         return sql_expressions_for_execute
 

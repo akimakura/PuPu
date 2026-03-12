@@ -33,6 +33,17 @@ class TestGeneratorRepository:
     ) -> None:
         assert expected == get_field_type_with_length(data_storages[0].fields[index_field])
 
+    def test_get_default_value_by_field_returns_none_for_nullable_measure(
+        self, data_storages: list[DataStorage]
+    ) -> None:
+        field = data_storages[0].fields[0]
+        field.allow_null_values_local = True
+
+        assert (
+            GeneratorRepository.get_default_value_by_field(field, DatabaseTypeEnum.CLICKHOUSE)
+            is None
+        )
+
     @pytest.mark.parametrize(
         ("expected", "index_data_storage", "database_object", "not_exists", "expected_raise"),
         [

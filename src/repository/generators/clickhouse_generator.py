@@ -27,6 +27,7 @@ from src.repository.utils import (
     get_field_type_with_length,
     get_filtred_database_object_by_data_storage,
     get_ip_address_by_dns_name,
+    is_nullable_measure_field,
     get_object_filtred_by_model_name,
 )
 from src.utils.backoff import RetryConfig, retry
@@ -41,7 +42,13 @@ class GeneratorClickhouseRepository(GeneratorRepository):
     """Генератор табличек в ClickHouse или совместимых баз"""
 
     @classmethod
-    def _get_create_column_sql(cls, field_name: str, field_type: str, default_value: Optional[str] = None) -> str:
+    def _get_create_column_sql(
+        cls,
+        field_name: str,
+        field_type: str,
+        default_value: Optional[str] = None,
+        is_nullable: bool = False,
+    ) -> str:
         """
         Создать запрос на добавление колонки.
         """
@@ -165,6 +172,8 @@ class GeneratorClickhouseRepository(GeneratorRepository):
             result_field_type = DATA_TYPES[db_type][field_type] + (f"({precision},{scale})" if with_precision else "")
         else:
             result_field_type = DATA_TYPES[db_type][field_type]
+        if is_nullable_measure_field(field):
+            result_field_type = f"Nullable({result_field_type})"
         if without_null:
             return result_field_type
         default_value = cls.get_default_value_by_field(field, db_type)
@@ -326,11 +335,24 @@ class GeneratorClickhouseRepository(GeneratorRepository):
         return possible_to_drop
 
     @classmethod
-    def _get_modify_column_sql(cls, field_name: str, field_type: str, default_value: Optional[str] = None) -> list[str]:
+    def _get_modify_column_sql(
+        cls,
+        field_name: str,
+        field_type: str,
+        default_value: Optional[str] = None,
+        is_nullable: bool = False,
+        current_field_type: Optional[str] = None,
+        current_is_nullable: bool = False,
+    ) -> list[str]:
         """
         Создать запрос на изменение колонки.
         """
-        default_value = f" DEFAULT {default_value}" if default_value is not None else default_value
+        if is_nullable:
+            sql_expressions = [f'MODIFY COLUMN "{field_name}" {field_type}']
+            if not current_is_nullable:
+                sql_expressions.append(f'MODIFY COLUMN "{field_name}" REMOVE DEFAULT')
+            return sql_expressions
+        default_value = f" DEFAULT {default_value}" if default_value is not None else ""
         return [f'MODIFY COLUMN "{field_name}" {field_type}{default_value}']
 
     @classmethod
@@ -588,14 +610,19 @@ class GeneratorClickhouseRepository(GeneratorRepository):
         )
         result: dict[str, dict[str, Any]] = defaultdict(dict)
         for field_description in fields_description:
+            raw_data_type = field_description[1]
+            is_nullable = raw_data_type.startswith("Nullable(")
+            if is_nullable:
+                raw_data_type = raw_data_type[len("Nullable(") : -1]
             result[field_description[0]].update(
                 {
                     "data_type": (
-                        remove_parentheses_content(field_description[1])
-                        if DATA_TYPES[DatabaseTypeEnum.CLICKHOUSE][DimensionTypeEnum.TIMESTAMP] in field_description[1]
-                        else field_description[1]
+                        remove_parentheses_content(raw_data_type)
+                        if DATA_TYPES[DatabaseTypeEnum.CLICKHOUSE][DimensionTypeEnum.TIMESTAMP] in raw_data_type
+                        else raw_data_type
                     ),
                     "is_primary_key": field_description[2],
+                    "is_nullable": is_nullable,
                 }
             )
         return result

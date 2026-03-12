@@ -2197,6 +2197,10 @@ components:
           type: string
         aggregationType:
           $ref: "#/components/schemas/aggregationType"
+        allowNullValuesLocal:
+          type: boolean
+          default: false
+          description: Разрешено ли NULL значение для поля
         precision:
           description: Overall lenght of data
           type: integer
@@ -2448,6 +2452,10 @@ components:
           $ref: "#/components/schemas/semanticType"
         type:
           $ref: "#/components/schemas/objectFieldType"
+        allowNullValuesLocal:
+          type: boolean
+          default: false
+          description: Локальная настройка nullable для measure-поля
     objectFieldType:
       description: Тип ссылочного поля
       type: object
@@ -2759,6 +2767,10 @@ components:
           description: authorization relevance
           type: boolean
           default: false
+        allowNullValues:
+          type: boolean
+          default: false
+          description: Разрешено ли NULL для значения показателя
         aggregationType:
           $ref: "#/components/schemas/aggregationType"
         unitOfMeasure:

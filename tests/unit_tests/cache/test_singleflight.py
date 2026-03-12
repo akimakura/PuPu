@@ -67,7 +67,9 @@ class TestSingleflightBarrier:
             assert token == ""
 
         redis.eval.assert_awaited_once()
-        _, _, lock_key, expected_old_token, new_token, ttl = redis.eval.await_args.args
+        await_args = redis.eval.await_args
+        assert await_args is not None
+        _, _, lock_key, expected_old_token, new_token, ttl = await_args.args
         assert lock_key == "singleflight:cache-key"
         assert expected_old_token == "old-token"
         assert ttl == "12"

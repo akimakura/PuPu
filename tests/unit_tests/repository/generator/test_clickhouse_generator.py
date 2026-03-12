@@ -58,6 +58,34 @@ class TestGeneratorClickhouseRepository:
         )
         assert res == expected
 
+    def test_get_table_field_type_for_nullable_measure_field(self, data_storages: list[DataStorage]) -> None:
+        field = data_storages[0].fields[0]
+        field.allow_null_values_local = True
+
+        assert (
+            GeneratorClickhouseRepository._get_table_field_type(field, database_model_list[0].type, True)
+            == "Nullable(Float32)"
+        )
+        assert (
+            GeneratorClickhouseRepository._get_table_field_type(field, database_model_list[0].type, False)
+            == "Nullable(Float32)"
+        )
+
+    def test_get_modify_column_sql_for_nullability_toggle(self) -> None:
+        assert GeneratorClickhouseRepository._get_modify_column_sql(
+            "value",
+            "Nullable(Float32)",
+            is_nullable=True,
+            current_is_nullable=False,
+        ) == ['MODIFY COLUMN "value" Nullable(Float32)', 'MODIFY COLUMN "value" REMOVE DEFAULT']
+        assert GeneratorClickhouseRepository._get_modify_column_sql(
+            "value",
+            "Float32",
+            default_value="0",
+            is_nullable=False,
+            current_is_nullable=True,
+        ) == ['MODIFY COLUMN "value" Float32 DEFAULT 0']
+
     @pytest.mark.parametrize(
         ("queries", "exception"),
         [

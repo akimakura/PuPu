@@ -1,0 +1,562 @@
+#Постановка задачи: Необходимо добавить возможность задавать значение NULL для показателя и поля-показателя.
+
+##Глосарий: Показатель = Measure
+
+##Критерии приёмки:
+1	При создании/изменении показателя через API MT можно задать true или false для поля "allowNullValues". По умолчанию значение false.
+2	При запросе данных показателя через API MT в ответе присутствует поле "allowNullValues" со значением true или false.
+3	При создании/изменении хранилища данных пользователь может изменить настройку поля-показателя в хранилище/измерении.
+4	У атрибута-показателя можно переопределить поведение настройки локально для хранилища данных/измерения, при условии, что allowNullValues=true.
+
+##Изменения в предоставляемом API:
+	###Measure
+	Необходимо добавить поле allowNullValues для следующих эндпоинтов:
+	Получение информации о показателе
+	GET /api/v0/tenants/{tenantName}/models/{modelName}/measures/
+	Get all measures by model name
+	
+	GET /api/v0/tenants/{tenantName}/models/{modelName}/measures/{measureName}
+	Get measures by model name and measure names
+	
+	POST /api/v0/tenants/{tenantName}/models/{modelName}/measures/
+	Get measures by model name and measure names
+	
+	####Пример для GET /api/v0/tenants/tenant1/models/nsi_stage/measures/engine_power:
+	Response (200 OK)
+    {
+        "version": 5,
+        "updatedAt": "2025-08-29 07:00:56.654",
+        "updatedBy": "EPMSuperUser",
+        "name": "engine_power",
+        "aorType": "sl_measure",
+        "precision": 31,
+        "labels": [
+          {
+            "language": "ru-ru",
+            "type": "LONG",
+            "text": "Мощность двигателя, кВт"
+          },
+          {
+            "language": "ru-ru",
+            "type": "SHORT",
+            "text": "Мощность двигателя"
+          }
+        ],
+        "models": [
+          "nsi_stage",
+          "transport",
+          "nsi_snap",
+          "nsi_mart"
+        ],
+        "type": "DECIMAL",
+        "scale": 14,
+        "authorizationRelevant": false,
+        "allowNullValues": false,       <-- здесь
+        "aggregationType": "SUMMATION",
+        "filter": [
+          {
+            "dimensionName": "equipment_unit",
+            "dimensionValue": "kw"
+          }
+        ],
+        "unitOfMeasure": {
+          "dimensionName": "unit",
+          "dimensionValue": "kw"
+        }
+    }
+	Примечание:
+	Поле allowNullValues означает поддержку значения NULL для показателя и принимает только Boolean значения.
+	По умолчанию значение allowNullValues=false.
+	
+
+    ####Запросы на создание
+    POST /api/v0/tenants/{tenantName}/models/{modelName}/measures/create
+    Create measure by model name
+
+    ####Пример для POST /api/v0/tenants/tenant1/models/test/measures/create
+    Body:
+    {
+      "labels": [
+        {
+          "language": "ru-ru",
+          "type": "SHORT",
+          "text": "r"
+        }
+      ],
+      "measureRef": "measure_kk",
+      "type": "FLOAT",
+      "precision": 1,
+      "scale": 34,
+      "authorizationRelevant": false,
+      "allowNullValues": false,     <-- здесь
+      "aggregationType": "SUMMATION",
+      "filter": [
+        {
+          "dimensionName": null,
+          "dimensionValue": "null"
+        }
+      ],
+      "unitOfMeasure": [
+        {
+          "dimensionName": null,
+          "dimensionValue": null
+        }
+      ],
+      "name": "objectname32"
+    }
+
+    Response (201 Create):
+    {
+      "version": 1,
+      "updatedAt": "2026-01-30 10:00:41.137",
+      "updatedBy": "12735116",
+      "name": "objectname32",
+      "aorType": "sl_measure",
+      "precision": 1,
+      "labels": [
+        {
+          "language": "ru-ru",
+          "type": "SHORT",
+          "text": "r"
+        },
+        {
+          "language": "ru-ru",
+          "type": "LONG",
+          "text": "r"
+        }
+      ],
+      "models": [
+        "test"
+      ],
+      "type": "FLOAT",
+      "scale": 34,
+      "authorizationRelevant": false,
+      "allowNullValues": false,     <-- здесь
+      "aggregationType": "SUMMATION",
+      "filter": null,
+      "unitOfMeasure": null
+    }
+
+
+    ####Запросы на изменение
+    PATCH /api/v0/tenants/{tenantName}/models/{modelName}/measures/{measureName}
+    Change measure by model name and measure name
+
+    Пример
+    Body:
+    {
+      "labels": [
+        {
+          "language": "ru-ru",
+          "type": "SHORT",
+          "text": "n"
+        }
+      ],
+      "measureRef": "objectname32",
+      "type": "FLOAT",
+      "precision": 0,
+      "scale": 34,
+      "authorizationRelevant": false,
+      "allowNullValues": false,     <-- здесь
+      "aggregationType": "SUMMATION",
+      "unitOfMeasure": "objectname32",
+      "filter": [
+        {
+          "dimensionName": "objectname32",
+          "dimensionValue": "I2IY20iPj5zCayy2KFcQPfz4WkvHyGGbp0xvQV9JFGNiRKrCproetB"
+        }
+      ]
+    }
+
+    Response (200 OK)
+    {
+      "labels": [
+        {
+          "language": "ru-ru",
+          "type": "SHORT",
+          "text": "n"
+        }
+      ],
+      "measureRef": "objectname32",
+      "type": "FLOAT",
+      "precision": 0,
+      "scale": 34,
+      "authorizationRelevant": false,
+      "allowNullValues": false,     <-- здесь
+      "aggregationType": "SUMMATION",
+      "unitOfMeasure": "objectname32",
+      "filter": [
+        {
+          "dimensionName": "objectname32",
+          "dimensionValue": "I2IY20iPj5zCayy2KFcQPfz4WkvHyGGbp0xvQV9JFGNiRKrCproetB"
+        }
+      ]
+    }
+
+
+    ###Data Storage
+    Необходимо добавить поле allowNullValuesLocal для следующих эндпоинтов:
+
+    ####1. Получение информации о хранилище данных
+    GET /api/v0/tenants/{tenantName}/models/{modelName}/dataStorages/{dataStorageName}
+    Get data storage by model name and data storage name
+
+    GET /api/v0/tenants/{tenantName}/models/{modelName}/dataStorages/
+    Get all data storages by model name
+
+    POST /api/v0/tenants/{tenantName}/models/{modelName}/dataStorages/byDbObject
+    Get dataStorages by model name and databaseObjects
+
+        #####Пример
+        GET /api/v0/tenants/tenant1/models/test_objects_sl/dataStorages/test7_attributes
+        Response (200 OK):
+        {
+            "version": 1,
+            "updatedAt": "2025-07-06 00:01:44.158",
+            "updatedBy": null,
+            "name": "test7_attributes",
+            "informationCategory": "K3",
+            "planningEnabled": false,
+            "models": [
+                "test_objects_sl"
+            ],
+            "type": "DIMENSION_ATTRIBUTES",
+            "aorType": "sl_datastorage",
+            "logDataStorageName": null,
+            "dbObjects": [
+                {
+                    "schemaName": "MD_SL",
+                    "objectType": "DICTIONARY",
+                    "name": "test7_attributes_d",
+                    "objectSpecificAttributes": []
+                },
+                {
+                    "schemaName": "MD_SL",
+                    "objectType": "REPLICATED_TABLE",
+                    "name": "test7_attributes",
+                    "objectSpecificAttributes": []
+                }
+            ],
+            "labels": [
+                {
+                    "language": "en-en",
+                    "type": "SHORT",
+                    "text": "test7_attributes"
+                },
+                {
+                    "language": "en-en",
+                    "type": "LONG",
+                    "text": "test7_attributes"
+                }
+            ],
+            "fields": [
+                {
+                    "type": {
+                        "refObjectType": "DIMENSION",
+                        "refObject": "test7"
+                    },
+                    "semanticType": "DIMENSION",
+                    "name": "test7",
+                    "labels": [
+                        {
+                            "language": "ru-ru",
+                            "type": "SHORT",
+                            "text": "test7"
+                        }
+                    ],
+                    "sqlName": "test7",
+                    "sqlColumnType": "text",
+                    "isShardingKey": false,
+                    "isKey": true
+                },
+                {
+                    "type": {
+                        "refObjectType": "DIMENSION",
+                        "refObject": "is_active"
+                    },
+                    "semanticType": "DIMENSION",
+                    "name": "is_active",
+                    "labels": [
+                        {
+                            "language": "ru-ru",
+                            "type": "SHORT",
+                            "text": "Флаг Активно"
+                        }
+                    ],
+                    "sqlName": "is_active",
+                    "sqlColumnType": "bool",
+                    "isShardingKey": false,
+                    "isKey": false
+                },
+                {
+                    "type": {
+                        "refObjectType": "ANYFIELD",
+                        "refObject": {
+                            "name": "dsad",
+                            "type": "INTEGER",
+                            "precision": 11,
+                            "labels": [
+                                {
+                                    "language": "ru-ru",
+                                    "type": "SHORT",
+                                    "text": "asdsad"
+                                }
+                            ],
+                            "scale": null,
+                            "aggregationType": "SUMMATION",
+                            "allowNullValuesLocal":false
+                        }
+                    },
+                    "semanticType": "MEASURE",
+                    "name": "dsad",
+                    "labels": [
+                        {
+                            "language": "ru-ru",
+                            "type": "SHORT",
+                            "text": "asdsad"
+                        }
+                    ],
+                    "sqlName": "dsad",
+                    "sqlColumnType": "int4",
+                     "isShardingKey": false,
+                    "isKey": false
+                },
+                {
+                    "type": {
+                        "refObjectType": "MEASURE",
+                        "refObject": "testp1"
+                    },
+                    "semanticType": "MEASURE",
+                    "name": "testp1",
+                    "labels": [
+                        {
+                            "language": "ru-ru",
+                            "type": "SHORT",
+                            "text": "asdsad"
+                        }
+                    ],
+                    "allowNullValuesLocal": false,
+                    "sqlName": "testp1",
+                    "sqlColumnType": "int4",
+                    "isShardingKey": false,
+                    "isKey": false
+                }
+            ]
+        }
+        Примечание
+        Поле allowNullValuesLocal означает локальную настройку для атрибута-показателя в хранилище данных и принимает только Boolean значения.
+        Для атрибута-показателя allowNullValuesLocal по умолчанию принимает такое же значение как поле allowNullValues у показателя.
+        Для "semanticType": "DIMENSION" поле allowNullValuesLocal по умолчанию false.
+
+    ####2. Запросы на создание
+    POST
+    /api/v0/tenants/{tenantName}/models/{modelName}/dataStorages/
+    Create Data Storage by model name
+        #####Пример
+        POST /api/v0/tenants/tenant1/models/test/demensions/create
+        {
+          "informationCategory": "K1",
+          "labels": [
+            {
+              "language": "ru-ru",
+              "type": "SHORT",
+              "text": "p"
+            }
+          ],
+          "type": "CUBELIKE",
+          "planningEnabled": false,
+          "logDataStorageName": "kk",
+          "dbObjects": [
+            {
+              "schemaName": "schema_name",
+              "name": "kk",
+              "objectType": "VIEW",
+              "objectSpecificAttributes": [
+                {
+                  "name": "TYPE",
+                  "value": "DICTIONARY"
+                }
+              ]
+            }
+          ],
+          "fields": [
+            {
+              "name": "objectname32",
+              "sqlName": "kk",
+              "sqlColumnType": "int4",
+              "labels": [
+                {
+                  "language": "ru-ru",
+                  "type": "SHORT",
+                  "text": "n"
+                }
+              ],
+              "isKey": false,
+              "isShardingKey": false,
+              "semanticType": "MEASURE",
+              "type": {
+                "refObjectType": "ANYFIELD",
+                "refObject": {
+                  "name": "objectname32",
+                  "labels": [
+                    {
+                      "language": "ru-ru",
+                      "type": "SHORT",
+                      "text": "i"
+                    }
+                  ],
+                  "type": "INTEGER",
+                  "aggregationType": "SUMMATION",
+                  "allowNullValuesLocal":false,
+                  "precision": 1333,
+                  "scale": 3
+                }
+              }
+            },
+            {
+                    "type": {
+                        "refObjectType": "MEASURE",
+                        "refObject": "testp1"
+                    },
+                    "semanticType": "MEASURE",
+                    "name": "testp1",
+                    "labels": [
+                        {
+                            "language": "ru-ru",
+                            "type": "SHORT",
+                            "text": "asdsad"
+                        }
+                    ],
+                    "allowNullValuesLocal": false,
+                    "sqlName": "testp1",
+                    "sqlColumnType": "int4",
+                    "isShardingKey": false,
+                    "isKey": false
+            }
+
+          ],
+          "name": "kk",
+          "models": [
+            "objectname32"
+          ],
+          "fbp": [
+            "FBP011"
+          ]
+        }
+        Примечание
+        При создании нового измерения задавать значение настройки allowNullValuesLocal можно только для "semanticType": "MEASURE".
+        "type": {
+          "refObjectType": "ANYFIELD"
+        }
+        Менять значение настройки allowNullValuesLocal для атрибута-показателя можно при условии, что у атрибута-показателя значение поля allowNullValues=true.
+        Для атрибута-показателя allowNullValuesLocal по умолчанию принимает такое же значение как поле allowNullValues у показателя.
+        Для "semanticType": "DIMENSION" поле allowNullValuesLocal по умолчанию false.
+
+    ####3. Запросы на изменение
+    PATCH
+    /api/v0/tenants/{tenantName}/models/{modelName}/dataStorages/{dataStorageName}
+    Change data storage
+        #####Пример:
+        {
+          "informationCategory": "K1",
+          "labels": [
+            {
+              "language": "ru-ru",
+              "type": "SHORT",
+              "text": "r"
+            }
+          ],
+          "type": "CUBELIKE",
+          "planningEnabled": false,
+          "logDataStorageName": "kk",
+          "dbObjects": [
+            {
+              "schemaName": "schema_name",
+              "name": "objectname255",
+              "objectType": "VIEW",
+              "objectSpecificAttributes": [
+                {
+                  "name": "TYPE",
+                  "value": "DICTIONARY"
+                }
+              ]
+            }
+          ],
+          "fields": [
+            {
+              "name": "objectname32",
+              "sqlName": "kk",
+              "sqlColumnType": "int4",
+              "labels": [
+                {
+                  "language": "ru-ru",
+                  "type": "SHORT",
+                  "text": "n"
+                }
+              ],
+              "isKey": false,
+              "isShardingKey": false,
+              "semanticType": "MEASURE",
+              "type": {
+                "refObjectType": "ANYFIELD",
+                "refObject": {
+                  "name": "objectname32",
+                  "labels": [
+                    {
+                      "language": "ru-ru",
+                      "type": "SHORT",
+                      "text": "i"
+                    }
+                  ],
+                  "type": "INTEGER",
+                  "aggregationType": "SUMMATION",
+                  "allowNullValuesLocal":false,
+                  "precision": 1333,
+                  "scale": 3
+                }
+              }
+            },
+            {
+                    "type": {
+                        "refObjectType": "MEASURE",
+                        "refObject": "testp1"
+                    },
+                    "semanticType": "MEASURE",
+                    "name": "testp1",
+                    "labels": [
+                        {
+                            "language": "ru-ru",
+                            "type": "SHORT",
+                            "text": "asdsad"
+                        }
+                    ],
+                    "allowNullValuesLocal": false,
+                    "sqlName": "testp1",
+                    "sqlColumnType": "int4",
+                    "isShardingKey": false,
+                    "isKey": false
+            }
+          ]
+        }
+        Примечание:
+        Менять значение настройки allowNullValuesLocal при условии, что у атрибута-показателя значение поля allowNullValues=true.
+        Для "semanticType": "DIMENSION" поле allowNullValuesLocal по умолчанию false.
+
+
+# 9. Изменения в структуре базы данных
+
+### 1. В таблицу **measure** и **measure_history** нужно добавить поле:
+| Поле              | Тип данных | Ключ | NOT NULL | Описание поля                                                  |
+| ----------------- | ---------- | ---- | -------- | -------------------------------------------------------------- |
+| allow_null_values | bool       |      | V        | Статус разрешения задавать NULL в качестве значения показателя |
+---
+### 2. В таблицу **any_field** и **any_field_history** нужно добавить поле:
+| Поле              | Тип данных | Ключ | NOT NULL | Описание поля                                                  |
+| ----------------- | ---------- | ---- | -------- | -------------------------------------------------------------- |
+| allow_null_values | bool       |      | V        | Статус разрешения задавать NULL в качестве значения показателя |
+---
+### 3. В таблицу **data_storage_field** и **data_storage_field_history** нужно добавить поле:
+| Поле                    | Тип данных | Ключ | NOT NULL | Описание поля                                                                 |
+| ----------------------- | ---------- | ---- | -------- | ----------------------------------------------------------------------------- |
+| allow_null_values_local | bool       |      | V        | Флаг значения настройки для атрибута-показателя в конкретном хранилище данных |
+---

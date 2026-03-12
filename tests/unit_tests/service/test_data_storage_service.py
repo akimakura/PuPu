@@ -18,15 +18,17 @@ from src.models.data_storage import (
     DataStorageEnum,
     DataStorageFieldRequest as DataStorageFieldRequestModel,
 )
-from src.models.database_object import DbObjectTypeEnum
+from src.models.database_object import DatabaseObjectRelationTypeEnum, DbObjectTypeEnum
 from src.models.field import BaseFieldType, BaseFieldTypeEnum, SemanticType
 from src.models.label import Label, LabelType, Language
 from src.models.request_params import DataStorageFieldsFileColumnEnum, DataStorageFileColumnEnum
+from src.models.tenant import SemanticObjectsTypeEnum
 from src.repository.aor import AorRepository
 from src.repository.data_storage import DataStorageRepository
 from src.repository.database_object import DatabaseObjectRepository
 from src.repository.database_object_relations import DatabaseObjectRelationsRepository
 from src.repository.dimension import DimensionRepository
+from src.repository.history.data_storage import DataStorageHistoryRepository
 from src.repository.model import ModelRepository
 from src.repository.model_relations import ModelRelationsRepository
 from src.service.data_storage import DataStorageService
@@ -621,6 +623,64 @@ class TestDataStorageService:
             )
         ).scalar_one()
         assert view_count == 0
+
+    async def test_save_history_moves_outdated_view_relations_to_history(
+        self,
+        mocked_session: AsyncSession,
+        data_storages: list[DataStorage],
+        models: list[Model],
+    ) -> None:
+        mocked_session.add_all(models)
+        await mocked_session.commit()
+        mocked_session.add_all(data_storages)
+        await mocked_session.commit()
+
+        data_storage = (
+            await mocked_session.execute(select(DataStorage).where(DataStorage.name == "test_dso1"))
+        ).scalars().one()
+        view = DatabaseObject(
+            version=1,
+            name="test_dso1_view",
+            schema_name="test_schema1",
+            tenant_id="tenant1",
+            type=DbObjectTypeEnum.VIEW,
+            specific_attributes=[],
+        )
+        mocked_session.add(view)
+        await mocked_session.flush()
+
+        relation = DatabaseObjectRelation(
+            semantic_object_type=SemanticObjectsTypeEnum.DATA_STORAGE,
+            semantic_object_id=data_storage.id,
+            semantic_object_version=data_storage.version,
+            database_object_id=view.id,
+            database_object_version=view.version,
+            relation_type=DatabaseObjectRelationTypeEnum.PARENT,
+            version=1,
+        )
+        mocked_session.add(relation)
+        await mocked_session.commit()
+
+        history_repository = DataStorageHistoryRepository(mocked_session)
+        await history_repository.save_history(data_storage, forced=True)
+
+        active_relations = (
+            await mocked_session.execute(select(DatabaseObjectRelation).where(DatabaseObjectRelation.id == relation.id))
+        ).scalars().all()
+        assert active_relations == []
+
+        relation_history_model = DatabaseObjectRelation.__history_mapper__.class_  # type: ignore
+        history_relation = (
+            await mocked_session.execute(
+                select(relation_history_model).where(
+                    relation_history_model.id == relation.id,
+                    relation_history_model.version == relation.version,
+                )
+            )
+        ).scalars().one()
+        assert history_relation.semantic_object_version == 1
+
+        assert data_storage.version == 2
 
     async def test_collect_views_for_model_returns_empty_when_no_views(
         self,

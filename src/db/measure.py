@@ -52,12 +52,14 @@ class Measure(FieldTypeMixin, Versioned, Base):
             "scale",
             "auth_relevant",
             "aggregation_type",
+            "allow_null_values",
         },
     }
     # Fields
     scale: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     auth_relevant: Mapped[bool] = mapped_column(Boolean, nullable=False)
     aggregation_type: Mapped[str] = mapped_column(String, nullable=False)
+    allow_null_values: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     dimension_id: Mapped[Optional[int]] = mapped_column(ForeignKey("dimension.id", ondelete="RESTRICT"), nullable=True)
     dimension_value: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     tenant_id: Mapped[str] = mapped_column(ForeignKey("tenant.name"), nullable=False)

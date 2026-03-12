@@ -93,6 +93,22 @@ class DataStorageField(ObjectField):
             models_limitations["data_storage_field"]["is_tech_field"]["validation_alias"][1],
         ),
     )
+    allow_null_values_local: bool = Field(
+        description=models_limitations["data_storage_field"]["allow_null_values_local"]["description"],
+        serialization_alias=models_limitations["data_storage_field"]["allow_null_values_local"]["serialization_alias"],
+        validation_alias=AliasChoices(
+            models_limitations["data_storage_field"]["allow_null_values_local"]["validation_alias"][0],
+            models_limitations["data_storage_field"]["allow_null_values_local"]["validation_alias"][1],
+        ),
+        default=False,
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def add_allow_null_values_local_default(cls, ds_field_obj: Any) -> Any:
+        if hasattr(ds_field_obj, "allow_null_values_local") and getattr(ds_field_obj, "allow_null_values_local") is None:
+            ds_field_obj.allow_null_values_local = False
+        return ds_field_obj
 
 
 class DataStorageFieldRequest(ObjectFieldRequest):
@@ -123,6 +139,15 @@ class DataStorageFieldRequest(ObjectFieldRequest):
             models_limitations["data_storage_field"]["is_tech_field"]["validation_alias"][0],
             models_limitations["data_storage_field"]["is_tech_field"]["validation_alias"][1],
         ),
+    )
+    allow_null_values_local: Optional[bool] = Field(
+        description=models_limitations["data_storage_field"]["allow_null_values_local"]["description"],
+        serialization_alias=models_limitations["data_storage_field"]["allow_null_values_local"]["serialization_alias"],
+        validation_alias=AliasChoices(
+            models_limitations["data_storage_field"]["allow_null_values_local"]["validation_alias"][0],
+            models_limitations["data_storage_field"]["allow_null_values_local"]["validation_alias"][1],
+        ),
+        default=None,
     )
 
 

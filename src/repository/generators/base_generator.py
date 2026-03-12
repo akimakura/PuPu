@@ -22,6 +22,7 @@ from src.repository.utils import (
     get_database_object_names,
     get_field_type_with_length,
     get_filtred_database_object_by_data_storage,
+    is_nullable_measure_field,
     get_object_filtred_by_model_name,
 )
 from src.utils.backoff import RetryConfig, retry
@@ -161,6 +162,8 @@ class GeneratorRepository:
     @classmethod
     def get_default_value_by_field(cls, field: DataStorageField, db_type: DatabaseTypeEnum) -> Optional[str]:
         """Возвращает дефолтное значение для поля."""
+        if is_nullable_measure_field(field):
+            return None
         _, _, field_type = get_field_type_with_length(field)
         if field.name == DATEFROM and field_type == DimensionTypeEnum.DATE:
             return f"'{DEFAULT_DATE_FROM}'"
@@ -183,14 +186,28 @@ class GeneratorRepository:
         return f"DROP COLUMN IF EXISTS `{field_name}`"
 
     @classmethod
-    def _get_create_column_sql(cls, field_name: str, field_type: str, default_value: Optional[str] = None) -> str:
+    def _get_create_column_sql(
+        cls,
+        field_name: str,
+        field_type: str,
+        default_value: Optional[str] = None,
+        is_nullable: bool = False,
+    ) -> str:
         """
         Создать запрос на добавление колонки.
         """
         raise NotImplementedError
 
     @classmethod
-    def _get_modify_column_sql(cls, field_name: str, field_type: str, default_value: Optional[str] = None) -> list[str]:
+    def _get_modify_column_sql(
+        cls,
+        field_name: str,
+        field_type: str,
+        default_value: Optional[str] = None,
+        is_nullable: bool = False,
+        current_field_type: Optional[str] = None,
+        current_is_nullable: bool = False,
+    ) -> list[str]:
         """
         Создать запрос на изменение колонки.
         """
@@ -1019,40 +1036,53 @@ class GeneratorRepository:
             dso_fields[dso_field.sql_name] = dso_field
             with_precision = dso_field.name != DataStorageLogsFieldEnum.TIMESTAMP
             dso_field_type = cls._get_table_field_type(dso_field, database.type, True, with_precision=with_precision)
-            if dso_field.sql_name in phis_table_fields:
+            dso_field_is_nullable = is_nullable_measure_field(dso_field)
+            db_field = phis_table_fields.get(dso_field.sql_name)
+            if db_field is not None:
+                db_field_type = db_field["data_type"]
+                db_field_is_key = db_field["is_primary_key"]
+                db_field_is_nullable = db_field.get("is_nullable", False)
+
                 if (
-                    dso_field_type == phis_table_fields[dso_field.sql_name]["data_type"]
-                    and dso_field.is_key == phis_table_fields[dso_field.sql_name]["is_primary_key"]
+                    dso_field_type == db_field_type
+                    and dso_field.is_key == db_field_is_key
+                    and dso_field_is_nullable == db_field_is_nullable
                 ):
                     continue
 
-                if dso_field.is_key != phis_table_fields[dso_field.sql_name]["is_primary_key"]:
+                if dso_field.is_key != db_field_is_key:
                     logger.debug(
                         "You cannot update the primary key (Meta is_key=%s, Db is_key=%s for field=%s). The table needs to be recreated.",
                         dso_field.is_key,
-                        phis_table_fields[dso_field.sql_name]["is_primary_key"],
+                        db_field_is_key,
                         dso_field.sql_name,
                     )
                     return True, False, []
 
-                if (
-                    dso_field_type != phis_table_fields[dso_field.sql_name]["data_type"]
-                    and phis_table_fields[dso_field.sql_name]["is_primary_key"]
-                ):
+                is_field_definition_changed = (
+                    dso_field_type != db_field_type or dso_field_is_nullable != db_field_is_nullable
+                )
+
+                if is_field_definition_changed and db_field_is_key:
                     logger.debug(
-                        "You cannot update the primary key type (Meta type=%s, Db type=%s for field=%s). The table needs to be recreated.",
+                        "You cannot update the primary key type/nullability (Meta type=%s, Db type=%s, Meta nullable=%s, Db nullable=%s for field=%s). The table needs to be recreated.",
                         dso_field_type,
-                        phis_table_fields[dso_field.sql_name]["data_type"],
+                        db_field_type,
+                        dso_field_is_nullable,
+                        db_field_is_nullable,
                         dso_field.sql_name,
                     )
                     return True, False, []
 
-                if dso_field_type != phis_table_fields[dso_field.sql_name]["data_type"]:
+                if is_field_definition_changed:
                     sql_expressions.extend(
                         cls._get_modify_column_sql(
                             dso_field.sql_name,
                             dso_field_type,
                             cls.get_default_value_by_field(dso_field, database.type),
+                            is_nullable=dso_field_is_nullable,
+                            current_field_type=db_field_type,
+                            current_is_nullable=db_field_is_nullable,
                         )
                     )
             elif dso_field.is_key:
@@ -1066,6 +1096,7 @@ class GeneratorRepository:
                         dso_field.sql_name,
                         dso_field_type,
                         cls.get_default_value_by_field(dso_field, database.type),
+                        is_nullable=dso_field_is_nullable,
                     )
                 )
 

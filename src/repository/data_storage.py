@@ -61,6 +61,7 @@ from src.repository.utils import (
     get_list_dimension_orm_by_session,
     get_object_filtred_by_model_name,
     get_select_query_with_offset_limit_order,
+    resolve_data_storage_field_allow_null_values_local,
 )
 
 DATA_STORAGE_LOG_TABLE_LEGTH = {
@@ -157,6 +158,11 @@ class DataStorageRepository:
         if is_tech_field is not None:
             field.is_tech_field = is_tech_field
         field.field_type = ref_type["ref_object_type"]
+        field.allow_null_values_local = resolve_data_storage_field_allow_null_values_local(
+            field={**field_dict, "semantic_type": field.semantic_type},
+            field_type=field.field_type,
+            object_field=object_field,
+        )
 
         field.dimension_id = None
         field.dimension = None
@@ -1484,8 +1490,7 @@ class DataStorageRepository:
             True,
         )
         for db_object in database_objects:
-            if db_object.schema_name != expected_schema:
-                db_object.schema_name = expected_schema
+            db_object.schema_name = expected_schema
         fields_payload = data_storage_dict.get("fields")
         if fields_payload is not None and data_storage.fields is not None:
             original_data_storage.sharding_key = self._generate_sharding_key_by_fields(data_storage.fields)

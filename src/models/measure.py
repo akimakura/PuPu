@@ -123,6 +123,15 @@ class MeasureCreateRequest(BaseModel):
         ),
         default=False,
     )
+    allow_null_values: bool = Field(
+        description=models_limitations["measure"]["allow_null_values"]["description"],
+        serialization_alias=models_limitations["measure"]["allow_null_values"]["serialization_alias"],
+        validation_alias=AliasChoices(
+            models_limitations["measure"]["allow_null_values"]["validation_alias"][0],
+            models_limitations["measure"]["allow_null_values"]["validation_alias"][1],
+        ),
+        default=False,
+    )
     aggregation_type: AggregationTypeEnum = Field(
         description=models_limitations["measure"]["aggregation_type"]["description"],
         serialization_alias=models_limitations["measure"]["aggregation_type"]["serialization_alias"],
@@ -242,6 +251,15 @@ class Measure(Versioned, BaseModel):
         ),
         default=False,
     )
+    allow_null_values: bool = Field(
+        description=models_limitations["measure"]["allow_null_values"]["description"],
+        serialization_alias=models_limitations["measure"]["allow_null_values"]["serialization_alias"],
+        validation_alias=AliasChoices(
+            models_limitations["measure"]["allow_null_values"]["validation_alias"][0],
+            models_limitations["measure"]["allow_null_values"]["validation_alias"][1],
+        ),
+        default=False,
+    )
     aggregation_type: AggregationTypeEnum = Field(
         description=models_limitations["measure"]["aggregation_type"]["description"],
         serialization_alias=models_limitations["measure"]["aggregation_type"]["serialization_alias"],
@@ -302,6 +320,8 @@ class Measure(Versioned, BaseModel):
 
         if hasattr(measure_obj, "dimension_id") and isinstance(measure_obj.dimension_id, str):
             measure_obj.dimension_name = measure_obj.dimension_id
+        if hasattr(measure_obj, "allow_null_values") and getattr(measure_obj, "allow_null_values") is None:
+            measure_obj.allow_null_values = False
         if (
             hasattr(measure_obj, "dimension_value")
             and hasattr(measure_obj, "dimension_name")
@@ -353,6 +373,15 @@ class MeasureEditRequest(BaseModel):
         validation_alias=AliasChoices(
             models_limitations["measure"]["auth_relevant"]["validation_alias"][0],
             models_limitations["measure"]["auth_relevant"]["validation_alias"][1],
+        ),
+        default=None,
+    )
+    allow_null_values: Optional[bool] = Field(
+        description=models_limitations["measure"]["allow_null_values"]["description"],
+        serialization_alias=models_limitations["measure"]["allow_null_values"]["serialization_alias"],
+        validation_alias=AliasChoices(
+            models_limitations["measure"]["allow_null_values"]["validation_alias"][0],
+            models_limitations["measure"]["allow_null_values"]["validation_alias"][1],
         ),
         default=None,
     )

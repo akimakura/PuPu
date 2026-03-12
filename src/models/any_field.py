@@ -91,7 +91,23 @@ class AnyField(BaseField):
         ),
         default=None,
     )
+    allow_null_values: bool = Field(
+        description=models_limitations["any_field"]["allow_null_values"]["description"],
+        serialization_alias=models_limitations["any_field"]["allow_null_values"]["serialization_alias"],
+        validation_alias=AliasChoices(
+            models_limitations["any_field"]["allow_null_values"]["validation_alias"][0],
+            models_limitations["any_field"]["allow_null_values"]["validation_alias"][1],
+        ),
+        default=False,
+    )
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def add_allow_null_values_default(cls, any_field_obj: Any) -> Any:
+        if hasattr(any_field_obj, "allow_null_values") and getattr(any_field_obj, "allow_null_values") is None:
+            any_field_obj.allow_null_values = False
+        return any_field_obj
 
     @field_validator("scale")
     @classmethod

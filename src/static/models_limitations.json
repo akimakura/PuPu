@@ -17,6 +17,14 @@
                 "aggregationType",
                 "aggregation_type"
             ]
+        },
+        "allow_null_values": {
+            "description": "Разрешено ли NULL значение для поля.",
+            "serialization_alias": "allowNullValuesLocal",
+            "validation_alias": [
+                "allowNullValuesLocal",
+                "allow_null_values"
+            ]
         }
     },
     "composite": {
@@ -661,6 +669,14 @@
                 "auth_relevant"
             ]
         },
+        "allow_null_values": {
+            "description": "Разрешено ли NULL для значения показателя.",
+            "serialization_alias": "allowNullValues",
+            "validation_alias": [
+                "allowNullValues",
+                "allow_null_values"
+            ]
+        },
         "aggregation_type": {
             "description": "Тип агрегации значений показателя или поля",
             "serialization_alias": "aggregationType",
@@ -1050,6 +1066,14 @@
             "validation_alias": [
                 "isTechField",
                 "is_tech_field"
+            ]
+        },
+        "allow_null_values_local": {
+            "description": "Локальная настройка nullable для measure-поля.",
+            "serialization_alias": "allowNullValuesLocal",
+            "validation_alias": [
+                "allowNullValuesLocal",
+                "allow_null_values_local"
             ]
         }
     },

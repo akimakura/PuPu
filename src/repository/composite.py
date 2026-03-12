@@ -1040,8 +1040,7 @@ class CompositeRepository:
             True,
         )
         for db_object in database_objects:
-            if db_object.schema_name != expected_schema:
-                db_object.schema_name = expected_schema
+            db_object.schema_name = expected_schema
         await self.create_additional_virtual_dimensions(model)
         database = DatabaseModel.model_validate(model.database)
         datasources = composite_dict.get(

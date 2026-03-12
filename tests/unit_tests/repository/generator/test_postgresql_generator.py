@@ -79,6 +79,35 @@ class TestGeneratorPostgreSQLRepository:
         )
         assert res == expected
 
+    def test_get_table_field_type_for_nullable_measure_field(self, data_storages: list[DataStorage]) -> None:
+        field = data_storages[0].fields[0]
+        field.allow_null_values_local = True
+
+        assert GeneratorPostgreSQLRepository._get_table_field_type(field, database_model_list[0].type, True) == "Float32"
+        assert GeneratorPostgreSQLRepository._get_table_field_type(field, database_model_list[0].type, False) == "Float32"
+
+    def test_get_modify_column_sql_for_nullability_toggle(self) -> None:
+        assert GeneratorPostgreSQLRepository._get_modify_column_sql(
+            "value",
+            "float4",
+            is_nullable=True,
+            current_field_type="float4",
+            current_is_nullable=False,
+        ) == ['ALTER COLUMN "value" DROP DEFAULT;', 'ALTER COLUMN "value" DROP NOT NULL']
+        assert GeneratorPostgreSQLRepository._get_modify_column_sql(
+            "value",
+            "float4",
+            default_value="0",
+            is_nullable=False,
+            current_field_type="float4",
+            current_is_nullable=True,
+        ) == [
+            'ALTER COLUMN "value" DROP DEFAULT;',
+            "__UPDATE_NULLS__|value|0",
+            'ALTER COLUMN "value" SET NOT NULL',
+            'ALTER COLUMN "value" SET DEFAULT 0',
+        ]
+
     @pytest.mark.parametrize(
         ("queries", "rows", "exception"),
         [
@@ -415,4 +444,25 @@ class TestGeneratorPostgreSQLRepository:
             "ALTER TABLE test_schema1.test_dso1 DROP COLUMN test_column1",
             "ALTER TABLE test_schema1.test_dso1_distr ADD COLUMN test_column int4",
             "ALTER TABLE test_schema1.test_dso1_distr DROP COLUMN test_column1",
+        ]
+
+    async def test_get_alter_database_objects_sql_expressions_renders_update_nulls(
+        self, monkeypatch: pytest.MonkeyPatch, data_storages: list[DataStorage]
+    ) -> None:
+        datastorage = data_storages[0]
+        model = datastorage.models[0]
+        sql_expressions = ["__UPDATE_NULLS__|value|0"]
+
+        monkeypatch.setattr(
+            "src.repository.generators.postgresql_generator.get_filtred_database_object_by_data_storage",
+            MagicMock(return_value=data_storage_model_list[0].database_objects),
+        )
+
+        result = await GeneratorPostgreSQLRepository.get_alter_database_objects_sql_expressions(
+            datastorage, model, sql_expressions
+        )
+
+        assert result == [
+            'UPDATE test_schema1.test_dso1 SET "value" = 0 WHERE "value" IS NULL',
+            'UPDATE test_schema1.test_dso1_distr SET "value" = 0 WHERE "value" IS NULL',
         ]
