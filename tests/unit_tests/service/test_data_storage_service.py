@@ -720,17 +720,16 @@ class TestDataStorageService:
         mocked_session.add(view)
         await mocked_session.flush()
 
-        mocked_session.add(
-            DatabaseObjectRelation(
-                semantic_object_type=SemanticObjectsTypeEnum.DATA_STORAGE,
-                semantic_object_id=data_storage.id,
-                semantic_object_version=data_storage.version,
-                database_object_id=view.id,
-                database_object_version=view.version,
-                relation_type=DatabaseObjectRelationTypeEnum.PARENT,
-                version=1,
-            )
+        relation = DatabaseObjectRelation(
+            semantic_object_type=SemanticObjectsTypeEnum.DATA_STORAGE,
+            semantic_object_id=data_storage.id,
+            semantic_object_version=data_storage.version,
+            database_object_id=view.id,
+            database_object_version=view.version,
+            relation_type=DatabaseObjectRelationTypeEnum.PARENT,
+            version=1,
         )
+        mocked_session.add(relation)
         await mocked_session.commit()
 
         history_repository = DataStorageHistoryRepository(mocked_session)
