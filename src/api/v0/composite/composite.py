@@ -2,10 +2,11 @@
 API для признаков.
 """
 
+import asyncio
 from http import HTTPStatus
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Depends, Header, Path, Query, Request
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Path, Query, Request
 from fastapi.responses import JSONResponse
 from py_common_lib.logger import EPMPYLogger, audit_types
 from py_common_lib.logger.enums import StatusType
@@ -29,6 +30,16 @@ from src.utils.hide_endpoint_decorator import hide_endpoint
 
 logger = EPMPYLogger(__name__)
 router = APIRouter()
+_SINGLEFLIGHT_DEBUG_ATTEMPTS: dict[str, int] = {}
+_SINGLEFLIGHT_DEBUG_LOCK = asyncio.Lock()
+
+
+async def _next_singleflight_debug_attempt(state_key: str) -> int:
+    """Возвращает следующий номер реального выполнения debug-роута."""
+    async with _SINGLEFLIGHT_DEBUG_LOCK:
+        attempt = _SINGLEFLIGHT_DEBUG_ATTEMPTS.get(state_key, 0) + 1
+        _SINGLEFLIGHT_DEBUG_ATTEMPTS[state_key] = attempt
+        return attempt
 
 
 @router.get(
@@ -87,6 +98,58 @@ async def get_composite_list_by_model_name(
             audit_kwargs=audit_kwargs, status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=reason
         )
     return [CompositeV0.model_validate(composite) for composite in result]
+
+
+@router.get(
+    COMPOSITE_URL + "/singleflight-debug",
+    status_code=HTTPStatus.OK,
+    description="Тестовый роут для проверки singleflight и error-state",
+    response_description="Результат выполнения тестового сценария",
+    response_model=dict[str, Any],
+    dependencies=[Depends(PermissionChecker(required_permissions=[PermissionEnum.COMPOSITE_VIEW]))],
+)
+@cache(namespace=CacheNamespaceEnum.COMPOSITE)
+async def singleflight_debug_route(
+    request: Request,
+    model_name: str = Path(alias="modelName"),
+    tenant_id: str = Path(alias="tenantName"),
+    test_key: str = Query(default="default", alias="testKey"),
+    sleep_seconds: float = Query(default=0.0, alias="sleepSeconds", ge=0.0),
+    fail_first_owners: int = Query(default=0, alias="failFirstOwners", ge=0),
+    cache_header: CacheHeaderEnum | str = Header(alias="Cache-Control", default=CacheHeaderEnum.EMPTY),
+) -> dict[str, Any]:
+    """Тестовый роут для ручной проверки singleflight при timeout и owner-failure."""
+    state_key = f"{tenant_id}:{model_name}:{test_key}"
+    attempt = await _next_singleflight_debug_attempt(state_key)
+
+    logger.info(
+        "Singleflight debug route executed: state_key=%s attempt=%s sleep_seconds=%s fail_first_owners=%s",
+        state_key,
+        attempt,
+        sleep_seconds,
+        fail_first_owners,
+    )
+
+    if sleep_seconds > 0:
+        await asyncio.sleep(sleep_seconds)
+
+    if attempt <= fail_first_owners:
+        raise HTTPException(
+            status_code=HTTPStatus.SERVICE_UNAVAILABLE,
+            detail={
+                "msg": "Synthetic owner failure",
+                "attempt": attempt,
+                "stateKey": state_key,
+            },
+        )
+
+    return {
+        "stateKey": state_key,
+        "attempt": attempt,
+        "sleepSeconds": sleep_seconds,
+        "failFirstOwners": fail_first_owners,
+        "path": request.url.path,
+    }
 
 
 @router.get(
