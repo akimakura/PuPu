@@ -2,6 +2,8 @@
 API для признаков.
 """
 
+import asyncio
+
 from http import HTTPStatus
 from typing import Annotated, Optional
 
@@ -52,6 +54,8 @@ async def get_data_storage_list_by_model_name(
     cache_header: CacheHeaderEnum | str = Header(alias="Cache-Control", default=CacheHeaderEnum.EMPTY),
 ) -> list[DataStorageV0]:
     """Получить список всех DSO."""
+    print(f"REAL WORK dataStorage list tenant={tenant_id} model={model_name}", flush=True)
+    await asyncio.sleep(20)
     audit_kwargs = {
         "audit_type": audit_types.C2,
         "status": StatusType.FAIL,

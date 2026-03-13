@@ -6,9 +6,6 @@ TENANT="${TENANT:-tenant1}"
 MODEL="${MODEL:-ror_dev_lt}"
 REQUESTS="${REQUESTS:-100}"
 CURL_MAX_TIME="${CURL_MAX_TIME:-180}"
-TAKEOVER_SLEEP_SECONDS="${TAKEOVER_SLEEP_SECONDS:-20}"
-FAIL_FIRST_OWNERS="${FAIL_FIRST_OWNERS:-4}"
-ERROR_TTL="${ERROR_TTL:-10}"
 AUTH_HEADER="${AUTH_HEADER:-}"
 API_KEY_HEADER="${API_KEY_HEADER:-}"
 
@@ -21,11 +18,27 @@ if [[ -n "$API_KEY_HEADER" ]]; then
 fi
 
 request_url() {
-  local test_key="$1"
-  local sleep_seconds="$2"
-  local fail_first_owners="$3"
-  printf "%s/api/v0/tenants/%s/models/%s/composites/singleflight-debug?testKey=%s&sleepSeconds=%s&failFirstOwners=%s" \
-    "$BASE_URL" "$TENANT" "$MODEL" "$test_key" "$sleep_seconds" "$fail_first_owners"
+  printf "%s/api/v0/tenants/%s/models/%s/dataStorages/" \
+    "$BASE_URL" "$TENANT" "$MODEL"
+}
+
+check_base_url() {
+  local probe_url="${BASE_URL%/}/openapi.json"
+  local status
+
+  status="$(
+    curl -sS --connect-timeout 3 --max-time 5 \
+      -o /dev/null \
+      -w "%{http_code}" \
+      "$probe_url" 2>/dev/null || true
+  )"
+
+  if [[ "$status" == "000" || -z "$status" ]]; then
+    echo "Service is unreachable from this shell: $BASE_URL" >&2
+    echo "If the app runs on another host or in Windows/WSL, pass BASE_URL explicitly." >&2
+    echo "Example: BASE_URL='http://<host>:8001' bash scripts/test_singleflight.sh" >&2
+    exit 1
+  fi
 }
 
 run_request() {
@@ -35,16 +48,20 @@ run_request() {
   local headers_file="$out_dir/$index.headers"
   local body_file="$out_dir/$index.body"
   local meta_file="$out_dir/$index.meta"
+  local err_file="$out_dir/$index.err"
   local status
 
-  status="$(
+  if ! status="$(
     curl -sS --max-time "$CURL_MAX_TIME" \
       "${COMMON_HEADERS[@]}" \
       -D "$headers_file" \
       -o "$body_file" \
       -w "%{http_code}" \
-      "$url"
-  )"
+      "$url" 2>"$err_file"
+  )"; then
+    printf "%s|CURL_ERROR|NONE\n" "$index" > "$meta_file"
+    return 0
+  fi
 
   local cache_status
   cache_status="$(
@@ -58,13 +75,20 @@ run_request() {
 summarize_burst() {
   local name="$1"
   local out_dir="$2"
+  shopt -s nullglob
+  local meta_files=("$out_dir"/*.meta)
+  shopt -u nullglob
 
   echo
   echo "=== $name ==="
+  if [[ ${#meta_files[@]} -eq 0 ]]; then
+    echo "No responses were collected."
+    return 1
+  fi
   echo "Statuses:"
-  cut -d'|' -f2 "$out_dir"/*.meta | sort | uniq -c | sort -nr
+  cut -d'|' -f2 "${meta_files[@]}" | sort | uniq -c | sort -nr
   echo "X-FastAPI-Cache:"
-  cut -d'|' -f3 "$out_dir"/*.meta | sort | uniq -c | sort -nr
+  cut -d'|' -f3 "${meta_files[@]}" | sort | uniq -c | sort -nr
   echo "Sample responses:"
   for index in 1 2 3; do
     if [[ -f "$out_dir/$index.meta" ]]; then
@@ -129,21 +153,9 @@ show_single_request() {
 }
 
 echo "Assumption: приложение запущено в одном worker-процессе."
-echo "Для takeover-сценария SINGLEFLIGHT_WAIT_TIMEOUT должен быть меньше TAKEOVER_SLEEP_SECONDS."
+echo "Для takeover-сценария SINGLEFLIGHT_WAIT_TIMEOUT должен быть меньше sleep в get_data_storage_list_by_model_name."
+check_base_url
 
-takeover_key="takeover-$(date +%s)"
-takeover_url="$(request_url "$takeover_key" "$TAKEOVER_SLEEP_SECONDS" "0")"
+takeover_url="$(request_url)"
 run_burst "Scenario 1: timeout takeover + eventual success" "$takeover_url"
 show_single_request "Scenario 1: post-warm cache check" "$takeover_url"
-
-error_key="error-open-$(date +%s)"
-error_url="$(request_url "$error_key" "0" "$FAIL_FIRST_OWNERS")"
-run_burst "Scenario 2: owner failures open error-state" "$error_url"
-show_single_request "Scenario 2: immediate cached error check" "$error_url"
-
-echo
-echo "Sleeping for error TTL: $((ERROR_TTL + 1))s"
-sleep "$((ERROR_TTL + 1))"
-
-show_single_request "Scenario 2: recovery request after error TTL" "$error_url"
-show_single_request "Scenario 2: cached success after recovery" "$error_url"
