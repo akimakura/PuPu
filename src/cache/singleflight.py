@@ -7,7 +7,6 @@ from redis.asyncio import Redis, RedisCluster
 logger = logging.getLogger(__name__)
 
 REDIS_ERROR = object()
-MAX_WAIT_ROUNDS = 2
 
 _RELEASE_LOCK_SCRIPT = """
 if redis.call("GET", KEYS[1]) == ARGV[1] then
@@ -15,6 +14,14 @@ if redis.call("GET", KEYS[1]) == ARGV[1] then
 else
     return 0
 end
+"""
+
+_INCREMENT_ERROR_COUNT_SCRIPT = """
+local count = redis.call("INCR", KEYS[1])
+if count == 1 then
+    redis.call("EXPIRE", KEYS[1], ARGV[1])
+end
+return count
 """
 
 _FORCE_ACQUIRE_SCRIPT = """
@@ -41,18 +48,19 @@ class SingleflightBarrier:
     Гарантирует, что при одновременных запросах к одному и тому же
     незакешированному ресурсу только один запрос выполняет реальное
     обращение к источнику данных, а остальные ожидают появления результата
-    в кэше.
+    в кеше.
 
     Механизм работы:
-    - Первый запрос захватывает блокировку (SET NX) и выполняет загрузку данных.
-    - Остальные запросы обнаруживают блокировку и поллят кэш, пока данные
-      не появятся или не истечёт таймаут.
-    - При таймауте один из ожидающих запросов может принудительно перехватить
-      блокировку через CAS (compare-and-swap), а остальные продолжают ждать
-      нового владельца блокировки.
+    - Первый запрос захватывает блокировку через ``SET NX`` и выполняет загрузку данных.
+    - Остальные запросы обнаруживают блокировку и опрашивают кеш,
+      пока данные не появятся или не истечёт таймаут.
+    - При таймауте один из ожидающих запросов может принудительно
+      перехватить блокировку через CAS, а остальные продолжают ждать.
     """
 
     LOCK_KEY_PREFIX = "singleflight:"
+    ERROR_KEY_PREFIX = "singleflight:error:"
+    ERROR_COUNT_KEY_PREFIX = "singleflight:error-count:"
 
     def __init__(
         self,
@@ -60,28 +68,46 @@ class SingleflightBarrier:
         lock_ttl: int = 30,
         wait_timeout: float = 10.0,
         poll_interval: float = 0.1,
+        max_owner_errors: int = 4,
+        error_ttl: int = 10,
+        error_counter_ttl: int = 10,
     ) -> None:
         self._redis = redis
         self._lock_ttl = lock_ttl
         self._wait_timeout = wait_timeout
         self._poll_interval = poll_interval
+        self._max_owner_errors = max_owner_errors
+        self._error_ttl = error_ttl
+        self._error_counter_ttl = error_counter_ttl
 
     def _lock_key(self, cache_key: str) -> str:
-        """Формирует ключ блокировки на основе ключа кэша."""
+        """Формирует ключ блокировки на основе ключа кеша."""
         return f"{self.LOCK_KEY_PREFIX}{cache_key}"
+
+    def _error_key(self, cache_key: str) -> str:
+        """Формирует ключ закешированной ошибки."""
+        return f"{self.ERROR_KEY_PREFIX}{cache_key}"
+
+    def _error_count_key(self, cache_key: str) -> str:
+        """Формирует ключ счётчика ошибок владельца блокировки."""
+        return f"{self.ERROR_COUNT_KEY_PREFIX}{cache_key}"
+
+    @staticmethod
+    def _decode_redis_value(raw: Optional[Union[bytes, str]]) -> Optional[str]:
+        """Нормализует значение Redis к строке."""
+        if raw is None:
+            return None
+        return raw.decode() if isinstance(raw, bytes) else raw
 
     # ---- базовые операции (пробрасывают исключения) ---------------------
 
     async def try_acquire(self, cache_key: str) -> Tuple[bool, str]:
-        """
-        Попытка захватить блокировку для данного ключа кэша.
+        """Пытается захватить блокировку для указанного ключа кеша.
 
         Возвращает кортеж ``(acquired, token)``:
 
-        - ``acquired=True``, ``token`` — наш токен. Вызывающий должен выполнить
-          запрос к источнику данных и затем вызвать :meth:`release`.
-        - ``acquired=False``, ``token`` — токен текущего владельца блокировки.
-          Вызывающий должен ожидать появления данных в кэше.
+        - ``acquired=True`` и ``token`` нашего владельца блокировки.
+        - ``acquired=False`` и ``token`` текущего владельца блокировки.
 
         При ошибке Redis пробрасывает исключение.
         """
@@ -94,14 +120,13 @@ class SingleflightBarrier:
             return True, token
 
         current_raw = await self._redis.get(lock_key)  # type: ignore[union-attr]
-        current_token = current_raw.decode() if isinstance(current_raw, bytes) else (current_raw or "")
+        current_token = self._decode_redis_value(current_raw) or ""
         return False, current_token
 
     async def release(self, cache_key: str, token: str) -> None:
-        """
-        Освобождает блокировку, если мы всё ещё являемся её владельцем.
+        """Освобождает блокировку, если мы всё ещё являемся её владельцем.
 
-        Используется атомарный Lua-скрипт: блокировка удаляется только
+        Использует атомарный Lua-скрипт: блокировка удаляется только
         при совпадении текущего значения с переданным ``token``.
         """
         lock_key = self._lock_key(cache_key)
@@ -111,28 +136,52 @@ class SingleflightBarrier:
             logger.exception("Singleflight: error releasing lock, key=%s", cache_key)
 
     async def get_lock_token(self, cache_key: str) -> Optional[str]:
-        """
-        Возвращает текущий токен блокировки или ``None``, если блокировка отсутствует.
+        """Возвращает текущий токен блокировки или ``None``, если блокировки нет.
 
         При ошибке Redis пробрасывает исключение.
         """
         lock_key = self._lock_key(cache_key)
         raw = await self._redis.get(lock_key)  # type: ignore[union-attr]
+        return self._decode_redis_value(raw)
+
+    async def get_error_ttl(self, cache_key: str) -> Optional[int]:
+        """Возвращает TTL открытого error-state или ``None``, если его нет."""
+        error_key = self._error_key(cache_key)
+        raw = await self._redis.get(error_key)  # type: ignore[union-attr]
         if raw is None:
             return None
-        return raw.decode() if isinstance(raw, bytes) else raw
+
+        ttl = await self._redis.ttl(error_key)  # type: ignore[union-attr]
+        return max(int(ttl), 0)
+
+    async def open_error_state(self, cache_key: str) -> None:
+        """Открывает error-state для ключа на короткий TTL."""
+        error_key = self._error_key(cache_key)
+        await self._redis.set(error_key, "1", ex=self._error_ttl)  # type: ignore[union-attr]
+
+    async def increment_owner_error_count(self, cache_key: str) -> int:
+        """Увеличивает счётчик ошибок владельца и возвращает новое значение."""
+        count_key = self._error_count_key(cache_key)
+        result = await self._redis.eval(  # type: ignore[union-attr]
+            _INCREMENT_ERROR_COUNT_SCRIPT,
+            1,
+            count_key,
+            str(self._error_counter_ttl),
+        )
+        return int(result)
+
+    async def clear_error_state(self, cache_key: str) -> None:
+        """Удаляет закешированную ошибку и счётчик ошибок для ключа."""
+        await self._redis.delete(  # type: ignore[union-attr]
+            self._error_key(cache_key),
+            self._error_count_key(cache_key),
+        )
 
     async def force_acquire(self, cache_key: str, expected_old_token: str) -> Tuple[bool, str]:
-        """
-        Принудительный захват блокировки при таймауте ожидания.
+        """Принудительно захватывает блокировку при таймауте ожидания.
 
-        Атомарно (через Lua-скрипт с CAS) заменяет блокировку новым
-        токеном, только если текущее значение совпадает с
-        ``expected_old_token`` либо блокировка уже истекла.
-
-        Если блокировка была заменена другим запросом (другой токен),
-        операция завершается неудачей — это предотвращает одновременный
-        принудительный захват несколькими ожидающими запросами.
+        Атомарно заменяет владельца блокировки новым токеном, если текущее
+        значение совпадает с ``expected_old_token`` либо блокировка уже истекла.
 
         При ошибке Redis пробрасывает исключение.
         """
@@ -158,13 +207,9 @@ class SingleflightBarrier:
     # ---- безопасные обёртки (для цикла ожидания) -----------------------
 
     async def safe_read_token(self, cache_key: str) -> Any:
-        """
-        Читает текущий токен блокировки с подавлением ошибок Redis.
+        """Читает токен блокировки с подавлением ошибок Redis.
 
-        Возвращает:
-        - ``str`` — токен текущего владельца блокировки.
-        - ``None`` — блокировка отсутствует.
-        - :data:`REDIS_ERROR` — ошибка при обращении к Redis.
+        Возвращает строковый токен, ``None`` либо :data:`REDIS_ERROR`.
         """
         try:
             return await self.get_lock_token(cache_key)
@@ -173,11 +218,7 @@ class SingleflightBarrier:
             return REDIS_ERROR
 
     async def safe_acquire(self, cache_key: str) -> Optional[str]:
-        """Пытается захватить блокировку с подавлением ошибок Redis.
-
-        Возвращает токен при успешном захвате или ``None`` (не удалось
-        захватить либо произошла ошибка Redis).
-        """
+        """Пытается захватить блокировку с подавлением ошибок Redis."""
         try:
             acquired, token = await self.try_acquire(cache_key)
             return token if acquired else None
@@ -186,11 +227,7 @@ class SingleflightBarrier:
             return None
 
     async def safe_force_acquire(self, cache_key: str, expected_old_token: str) -> Optional[str]:
-        """Принудительно захватывает блокировку с подавлением ошибок Redis.
-
-        Возвращает новый токен при успешном захвате или ``None`` (не удалось
-        захватить либо произошла ошибка Redis).
-        """
+        """Принудительно захватывает блокировку с подавлением ошибок Redis."""
         try:
             acquired, token = await self.force_acquire(cache_key, expected_old_token)
             return token if acquired else None
@@ -198,12 +235,49 @@ class SingleflightBarrier:
             logger.exception("Singleflight: force acquire error, key=%s", cache_key)
             return None
 
+    async def safe_get_error_ttl(self, cache_key: str) -> Optional[int]:
+        """Читает TTL открытого error-state с подавлением ошибок Redis."""
+        try:
+            return await self.get_error_ttl(cache_key)
+        except Exception:
+            logger.exception("Singleflight: error reading error-state, key=%s", cache_key)
+            return None
+
+    async def safe_open_error_state(self, cache_key: str) -> bool:
+        """Открывает error-state с подавлением ошибок Redis."""
+        try:
+            await self.open_error_state(cache_key)
+            return True
+        except Exception:
+            logger.exception("Singleflight: error opening owner error state, key=%s", cache_key)
+            return False
+
+    async def safe_increment_owner_error_count(self, cache_key: str) -> Optional[int]:
+        """Увеличивает счётчик ошибок владельца с подавлением ошибок Redis."""
+        try:
+            return await self.increment_owner_error_count(cache_key)
+        except Exception:
+            logger.exception("Singleflight: error incrementing owner error count, key=%s", cache_key)
+            return None
+
+    async def safe_clear_error_state(self, cache_key: str) -> None:
+        """Удаляет состояние ошибок с подавлением ошибок Redis."""
+        try:
+            await self.clear_error_state(cache_key)
+        except Exception:
+            logger.exception("Singleflight: error clearing owner error state, key=%s", cache_key)
+
     @property
     def wait_timeout(self) -> float:
-        """Таймаут ожидания кэша на одного владельца блокировки (секунды)."""
+        """Таймаут ожидания кеша для одного владельца блокировки в секундах."""
         return self._wait_timeout
 
     @property
     def poll_interval(self) -> float:
-        """Интервал опроса кэша (секунды)."""
+        """Интервал опроса кеша в секундах."""
         return self._poll_interval
+
+    @property
+    def max_owner_errors(self) -> int:
+        """Порог подряд идущих ошибок владельца перед записью error-cache."""
+        return self._max_owner_errors

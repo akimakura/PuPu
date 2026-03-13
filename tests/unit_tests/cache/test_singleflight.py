@@ -86,6 +86,53 @@ class TestSingleflightBarrier:
 
         redis.eval.assert_awaited_once()
 
+    async def test_get_error_ttl_returns_ttl_when_error_state_exists(self) -> None:
+        redis = MagicMock()
+        redis.get = AsyncMock(return_value=b"1")
+        redis.ttl = AsyncMock(return_value=7)
+
+        barrier = SingleflightBarrier(redis=redis)
+
+        ttl = await barrier.get_error_ttl("cache-key")
+
+        assert ttl == 7
+        redis.get.assert_awaited_once_with("singleflight:error:cache-key")
+        redis.ttl.assert_awaited_once_with("singleflight:error:cache-key")
+
+    async def test_open_error_state_and_clear_error_state_use_expected_keys(self) -> None:
+        redis = MagicMock()
+        redis.set = AsyncMock()
+        redis.delete = AsyncMock()
+
+        barrier = SingleflightBarrier(redis=redis, error_ttl=10)
+
+        await barrier.open_error_state("cache-key")
+        await barrier.clear_error_state("cache-key")
+
+        redis.set.assert_awaited_once_with("singleflight:error:cache-key", "1", ex=10)
+        redis.delete.assert_awaited_once_with(
+            "singleflight:error:cache-key",
+            "singleflight:error-count:cache-key",
+        )
+
+    async def test_increment_owner_error_count_returns_new_value(self) -> None:
+        redis = MagicMock()
+        redis.eval = AsyncMock(return_value=4)
+
+        barrier = SingleflightBarrier(redis=redis, error_counter_ttl=10)
+
+        count = await barrier.increment_owner_error_count("cache-key")
+
+        assert count == 4
+        redis.eval.assert_awaited_once()
+        await_args = redis.eval.await_args
+        assert await_args is not None
+        assert await_args.args[1:] == (
+            1,
+            "singleflight:error-count:cache-key",
+            "10",
+        )
+
     async def test_safe_read_token_returns_redis_error_on_exception(self) -> None:
         redis = MagicMock()
         barrier = SingleflightBarrier(redis=redis)
@@ -106,3 +153,20 @@ class TestSingleflightBarrier:
 
         assert acquire_result is None
         assert force_acquire_result is None
+
+    async def test_safe_error_helpers_return_fallbacks_on_exception(self) -> None:
+        redis = MagicMock()
+        barrier = SingleflightBarrier(redis=redis)
+        barrier.get_error_ttl = AsyncMock(side_effect=RuntimeError("redis error"))  # type: ignore[method-assign]
+        barrier.open_error_state = AsyncMock(side_effect=RuntimeError("redis error"))  # type: ignore[method-assign]
+        barrier.increment_owner_error_count = AsyncMock(side_effect=RuntimeError("redis error"))  # type: ignore[method-assign]
+        barrier.clear_error_state = AsyncMock(side_effect=RuntimeError("redis error"))  # type: ignore[method-assign]
+
+        ttl = await barrier.safe_get_error_ttl("cache-key")
+        cache_result = await barrier.safe_open_error_state("cache-key")
+        error_count = await barrier.safe_increment_owner_error_count("cache-key")
+        await barrier.safe_clear_error_state("cache-key")
+
+        assert ttl is None
+        assert cache_result is False
+        assert error_count is None

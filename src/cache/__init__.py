@@ -4,6 +4,7 @@ from py_common_lib.logger import EPMPYLogger
 
 from src.cache.coder import Coder, JsonCoder
 from src.cache.key_builder import default_key_builder
+from src.cache.singleflight import SingleflightBarrier
 from src.cache.types import Backend, KeyBuilder
 
 logger = EPMPYLogger(__name__)
@@ -90,13 +91,25 @@ class FastAPICache:
         is_call_init = cls._backend and cls._prefix is not None
         assert is_call_init, "You must call init first!"  # noqa: S101
         if cls._enable and cls._prefix is not None and cls._backend is not None:
-            namespace = cls._prefix + (":" + namespace if namespace else "")
-            result = await cls._backend.clear(namespace, key)
+            cache_namespace = cls._prefix + (":" + namespace if namespace else "")
+            related_prefixes = (
+                SingleflightBarrier.LOCK_KEY_PREFIX,
+                SingleflightBarrier.ERROR_KEY_PREFIX,
+                SingleflightBarrier.ERROR_COUNT_KEY_PREFIX,
+            )
+            if key is None:
+                result = await cls._backend.clear(cache_namespace, None)
+                for prefix in related_prefixes:
+                    result += await cls._backend.clear(f"{prefix}{cache_namespace}", None)
+            else:
+                result = await cls._backend.clear(None, key)
+                for prefix in related_prefixes:
+                    result += await cls._backend.clear(None, f"{prefix}{key}")
             logger.debug(
                 "Cache cleared",
                 extra={
                     "params": {
-                        "namespace": namespace + ":*",
+                        "namespace": cache_namespace + ":*",
                         "key": key,
                     },
                     "include_fields": ["params"],

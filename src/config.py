@@ -157,6 +157,9 @@ class Settings(BaseSettings):
     SINGLEFLIGHT_LOCK_TTL: int = 30
     SINGLEFLIGHT_WAIT_TIMEOUT: float = 10.0
     SINGLEFLIGHT_POLL_INTERVAL: float = 0.1
+    SINGLEFLIGHT_MAX_OWNER_ERRORS: int = 4
+    SINGLEFLIGHT_ERROR_TTL: int = 10
+    SINGLEFLIGHT_ERROR_COUNTER_TTL: int = 10
     # ==== паттерны создания имен DataStorage ====
     VALUES_DATASTORAGE_PATTERN: str = "%s_values"
     TEXT_DATASTORAGE_PATTERN: str = "%s_texts"
